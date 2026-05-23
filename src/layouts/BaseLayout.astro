@@ -46,14 +46,16 @@ const isAdmin = pathname.startsWith('/admin');
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --bg: #0c0b0a;
-    --surface: #161412;
-    --surface-2: #1f1c19;
-    --border: #2a2520;
-    --text: #ede8e0;
-    --text-muted: #8a8278;
-    --accent: #d4a8a0;
-    --accent-dim: #9a6e68;
+    --bg: #f0f9f0;
+    --surface: #ffffff;
+    --surface-2: #e6f4e6;
+    --border: #b4d9b4;
+    --text: #162816;
+    --text-muted: #4e724e;
+    --green-light: #8dd4a0;
+    --green-vivid: #1a9940;
+    --accent: #ff5714;
+    --accent-dim: #cc4410;
     --font-serif: 'EB Garamond', 'Shippori Mincho', serif;
     --font-jp: 'Shippori Mincho', 'EB Garamond', serif;
     --max-w: 1280px;
@@ -77,7 +79,7 @@ const isAdmin = pathname.startsWith('/admin');
     inset: 0;
     pointer-events: none;
     z-index: 999;
-    opacity: 0.03;
+    opacity: 0.018;
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
     background-repeat: repeat;
     background-size: 128px 128px;
@@ -93,7 +95,7 @@ const isAdmin = pathname.startsWith('/admin');
     justify-content: space-between;
     padding: 1.25rem clamp(1.5rem, 5vw, 3rem);
     border-bottom: 1px solid var(--border);
-    background: rgba(12, 11, 10, 0.85);
+    background: rgba(240, 249, 240, 0.88);
     backdrop-filter: blur(12px);
   }
 
@@ -101,7 +103,7 @@ const isAdmin = pathname.startsWith('/admin');
     font-family: var(--font-jp);
     font-weight: 600;
     font-size: 1.25rem;
-    color: var(--text);
+    color: var(--green-vivid);
     text-decoration: none;
     letter-spacing: 0.08em;
     transition: color 0.2s;
@@ -129,23 +131,23 @@ const isAdmin = pathname.startsWith('/admin');
     bottom: -2px;
     left: 0;
     width: 0;
-    height: 1px;
-    background: var(--accent);
+    height: 2px;
+    background: var(--green-vivid);
     transition: width 0.3s ease;
   }
   .nav-link:hover,
-  .nav-link.active { color: var(--text); }
+  .nav-link.active { color: var(--green-vivid); }
   .nav-link.active::after,
   .nav-link:hover::after { width: 100%; }
 
   .nav-admin {
-    color: var(--accent-dim);
-    border: 1px solid var(--border);
+    color: var(--accent);
+    border: 1px solid rgba(255, 87, 20, 0.35);
     padding: 0.25rem 0.75rem;
     border-radius: 2px;
     font-size: 0.75rem;
   }
-  .nav-admin:hover { color: var(--accent); border-color: var(--accent-dim); }
+  .nav-admin:hover { color: var(--accent-dim); border-color: var(--accent); }
   .nav-admin::after { display: none; }
 
   /* Footer */
@@ -174,10 +176,11 @@ const isAdmin = pathname.startsWith('/admin');
   .image-card {
     position: relative;
     overflow: hidden;
-    border-radius: 2px;
+    border-radius: 3px;
     background: var(--surface);
     aspect-ratio: 1;
     cursor: pointer;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.13);
   }
 
   .image-card img {
@@ -189,7 +192,7 @@ const isAdmin = pathname.startsWith('/admin');
 
   .image-card:hover img {
     transform: scale(1.04);
-    filter: brightness(0.7);
+    filter: brightness(0.72);
   }
 
   .image-card-overlay {
@@ -199,7 +202,7 @@ const isAdmin = pathname.startsWith('/admin');
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
-    background: linear-gradient(to top, rgba(12,11,10,0.85) 0%, transparent 60%);
+    background: linear-gradient(to top, rgba(10, 24, 10, 0.82) 0%, transparent 60%);
     opacity: 0;
     transition: opacity 0.3s;
   }
@@ -209,7 +212,7 @@ const isAdmin = pathname.startsWith('/admin');
   .image-card-title {
     font-size: 0.875rem;
     font-weight: 500;
-    color: var(--text);
+    color: #fff;
     letter-spacing: 0.04em;
   }
 
@@ -222,15 +225,15 @@ const isAdmin = pathname.startsWith('/admin');
 
   .tag-pill {
     font-size: 0.7rem;
-    color: var(--accent);
-    background: rgba(212, 168, 160, 0.15);
+    color: #fff;
+    background: rgba(255, 87, 20, 0.75);
     padding: 0.15rem 0.5rem;
     border-radius: 1px;
     letter-spacing: 0.04em;
     text-decoration: none;
     transition: background 0.2s;
   }
-  .tag-pill:hover { background: rgba(212, 168, 160, 0.3); }
+  .tag-pill:hover { background: rgba(255, 87, 20, 0.95); }
 
   /* Page header */
   .page-header {
@@ -272,8 +275,8 @@ const isAdmin = pathname.startsWith('/admin');
     border-radius: 2px;
     transition: color 0.2s, border-color 0.2s;
   }
-  .pagination a:hover { color: var(--text); border-color: var(--text-muted); }
-  .pagination .current { color: var(--accent); border-color: var(--accent-dim); }
+  .pagination a:hover { color: var(--green-vivid); border-color: var(--green-vivid); }
+  .pagination .current { color: var(--green-vivid); border-color: var(--green-vivid); }
 
   /* Button */
   .btn {
@@ -292,25 +295,25 @@ const isAdmin = pathname.startsWith('/admin');
   }
 
   .btn-primary {
-    background: var(--accent);
-    color: var(--bg);
+    background: var(--green-vivid);
+    color: #fff;
     font-weight: 600;
   }
-  .btn-primary:hover { background: #e0bab3; }
+  .btn-primary:hover { background: #148034; }
 
   .btn-ghost {
     background: transparent;
     color: var(--text-muted);
     border: 1px solid var(--border);
   }
-  .btn-ghost:hover { color: var(--text); border-color: var(--text-muted); }
+  .btn-ghost:hover { color: var(--green-vivid); border-color: var(--green-vivid); }
 
   .btn-danger {
     background: transparent;
-    color: #c97070;
-    border: 1px solid #5a3030;
+    color: #c05050;
+    border: 1px solid rgba(192, 80, 80, 0.4);
   }
-  .btn-danger:hover { background: rgba(201, 112, 112, 0.15); }
+  .btn-danger:hover { background: rgba(192, 80, 80, 0.1); }
 
   /* Form elements */
   .form-group {
@@ -342,7 +345,7 @@ const isAdmin = pathname.startsWith('/admin');
   }
 
   input:focus, textarea:focus, select:focus {
-    border-color: var(--accent-dim);
+    border-color: var(--green-vivid);
   }
 
   textarea { resize: vertical; min-height: 80px; }
@@ -376,7 +379,7 @@ const isAdmin = pathname.startsWith('/admin');
     color: var(--text);
     background: var(--surface-2);
   }
-  .admin-sidebar-link.active { color: var(--accent); }
+  .admin-sidebar-link.active { color: var(--green-vivid); }
 
   .admin-content {
     padding: 2rem clamp(1.5rem, 3vw, 2.5rem);

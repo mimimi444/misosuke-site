@@ -48,14 +48,16 @@ const pathname = Astro.url.pathname;
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --bg: #0c0b0a;
-    --surface: #161412;
-    --surface-2: #1f1c19;
-    --border: #2a2520;
-    --text: #ede8e0;
-    --text-muted: #8a8278;
-    --accent: #d4a8a0;
-    --accent-dim: #9a6e68;
+    --bg: #f0f9f0;
+    --surface: #ffffff;
+    --surface-2: #e6f4e6;
+    --border: #b4d9b4;
+    --text: #162816;
+    --text-muted: #4e724e;
+    --green-light: #8dd4a0;
+    --green-vivid: #1a9940;
+    --accent: #ff5714;
+    --accent-dim: #cc4410;
     --font-serif: 'EB Garamond', 'Shippori Mincho', serif;
     --font-jp: 'Shippori Mincho', 'EB Garamond', serif;
   }
@@ -75,7 +77,7 @@ const pathname = Astro.url.pathname;
     inset: 0;
     pointer-events: none;
     z-index: 999;
-    opacity: 0.03;
+    opacity: 0.018;
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
     background-repeat: repeat;
     background-size: 128px 128px;
@@ -90,7 +92,7 @@ const pathname = Astro.url.pathname;
     gap: 1rem;
     padding: 1.25rem clamp(1.5rem, 5vw, 3rem);
     border-bottom: 1px solid var(--border);
-    background: rgba(12, 11, 10, 0.9);
+    background: rgba(240, 249, 240, 0.88);
     backdrop-filter: blur(12px);
   }
 
@@ -98,15 +100,15 @@ const pathname = Astro.url.pathname;
     font-family: var(--font-jp);
     font-weight: 600;
     font-size: 1.125rem;
-    color: var(--text);
+    color: var(--green-vivid);
     text-decoration: none;
     letter-spacing: 0.08em;
   }
 
   .admin-badge {
     font-size: 0.7rem;
-    color: var(--accent-dim);
-    border: 1px solid var(--border);
+    color: var(--accent);
+    border: 1px solid rgba(255, 87, 20, 0.35);
     padding: 0.2rem 0.5rem;
     border-radius: 2px;
     letter-spacing: 0.06em;
@@ -120,7 +122,7 @@ const pathname = Astro.url.pathname;
     text-decoration: none;
     transition: color 0.2s;
   }
-  .nav-link:hover { color: var(--text); }
+  .nav-link:hover { color: var(--green-vivid); }
 
   .admin-layout {
     display: grid;
@@ -150,8 +152,8 @@ const pathname = Astro.url.pathname;
     letter-spacing: 0.04em;
     transition: color 0.2s, background 0.2s;
   }
-  .admin-sidebar-link:hover { color: var(--text); background: var(--surface-2); }
-  .admin-sidebar-link.active { color: var(--accent); background: var(--surface-2); }
+  .admin-sidebar-link:hover { color: var(--green-vivid); background: var(--surface-2); }
+  .admin-sidebar-link.active { color: var(--green-vivid); background: var(--surface-2); }
 
   .admin-content { padding: 2rem clamp(1.5rem, 3vw, 2.5rem); }
 
@@ -182,12 +184,12 @@ const pathname = Astro.url.pathname;
     border: none;
     text-decoration: none;
   }
-  .btn-primary { background: var(--accent); color: var(--bg); font-weight: 600; }
-  .btn-primary:hover { background: #e0bab3; }
+  .btn-primary { background: var(--green-vivid); color: #fff; font-weight: 600; }
+  .btn-primary:hover { background: #148034; }
   .btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
-  .btn-ghost:hover { color: var(--text); border-color: var(--text-muted); }
-  .btn-danger { background: transparent; color: #c97070; border: 1px solid #5a3030; }
-  .btn-danger:hover { background: rgba(201, 112, 112, 0.15); }
+  .btn-ghost:hover { color: var(--green-vivid); border-color: var(--green-vivid); }
+  .btn-danger { background: transparent; color: #c05050; border: 1px solid rgba(192, 80, 80, 0.4); }
+  .btn-danger:hover { background: rgba(192, 80, 80, 0.1); }
 
   .form-group { display: flex; flex-direction: column; gap: 0.5rem; }
 
@@ -208,6 +210,6 @@ const pathname = Astro.url.pathname;
     outline: none;
     transition: border-color 0.2s;
   }
-  input:focus, textarea:focus, select:focus { border-color: var(--accent-dim); }
+  input:focus, textarea:focus, select:focus { border-color: var(--green-vivid); }
   textarea { resize: vertical; min-height: 80px; }
 </style>
