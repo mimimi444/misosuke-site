@@ -1,0 +1,270 @@
+---
+import AdminLayout from '../../../../layouts/AdminLayout.astro';
+import { getDb } from '../../../../db/client';
+import { albums, albumImages, images, imageTags, tags } from '../../../../db/schema';
+import { eq, desc, sql, asc } from 'drizzle-orm';
+import { r2Url } from '../../../../lib/r2url';
+import { actions } from 'astro:actions';
+import { env } from 'cloudflare:workers';
+
+const { id } = Astro.params;
+
+type ImageRow = typeof images.$inferSelect & { tagList: string | null };
+
+let album: typeof albums.$inferSelect | null = null;
+let allImages: ImageRow[] = [];
+let albumImageIds: string[] = [];
+let formError = '';
+
+try {
+  const db = getDb(env.DB);
+
+  const [found] = await db.select().from(albums).where(eq(albums.id, id!));
+  if (!found) return Astro.redirect('/admin/albums');
+  album = found;
+
+  const currentImages = await db
+    .select({ imageId: albumImages.imageId })
+    .from(albumImages)
+    .where(eq(albumImages.albumId, id!))
+    .orderBy(asc(albumImages.sortOrder));
+  albumImageIds = currentImages.map(r => r.imageId);
+
+  const rows = await db
+    .select({
+      id: images.id,
+      title: images.title,
+      description: images.description,
+      r2Key: images.r2Key,
+      width: images.width,
+      height: images.height,
+      createdAt: images.createdAt,
+      tagList: sql<string>`group_concat(${tags.name}, ',')`,
+    })
+    .from(images)
+    .leftJoin(imageTags, eq(imageTags.imageId, images.id))
+    .leftJoin(tags, eq(tags.id, imageTags.tagId))
+    .groupBy(images.id)
+    .orderBy(desc(images.createdAt));
+  allImages = rows as ImageRow[];
+} catch (e) {
+  formError = 'データの読み込みに失敗しました';
+}
+
+if (Astro.request.method === 'POST' && album) {
+  const fd = await Astro.request.formData();
+  const title = fd.get('title')?.toString() ?? '';
+  const description = fd.get('description')?.toString() ?? '';
+  const imageIds = fd.get('imageIds')?.toString() ?? '';
+  const coverImageId = fd.get('coverImageId')?.toString() || undefined;
+
+  const { error } = await Astro.callAction(actions.updateAlbum, {
+    id: album.id,
+    title,
+    description,
+    imageIds,
+    coverImageId,
+  });
+
+  if (!error) {
+    return Astro.redirect('/admin/albums');
+  }
+  formError = error.message ?? 'アルバムの更新に失敗しました';
+}
+---
+
+<AdminLayout title="アルバムを編集">
+  <div class="edit-header">
+    <a href="/admin/albums" class="back-link">← アルバム一覧</a>
+    <h2 class="admin-section-title">アルバムを編集</h2>
+  </div>
+
+  {!album ? (
+    <p style="color:var(--text-muted)">アルバムが見つかりません。</p>
+  ) : (
+    <form method="POST" class="edit-album-form">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="title">タイトル <span class="required">*</span></label>
+          <input type="text" id="title" name="title" required value={album.title} />
+        </div>
+        <div class="form-group">
+          <label for="description">説明（任意）</label>
+          <input type="text" id="description" name="description" value={album.description ?? ''} />
+        </div>
+      </div>
+
+      <input type="hidden" name="imageIds" id="imageIdsInput" value={albumImageIds.join(',')} />
+      <input type="hidden" name="coverImageId" id="coverImageIdInput" value={album.coverImageId ?? ''} />
+
+      <div class="image-picker-section">
+        <div class="picker-header">
+          <h3 class="picker-title">画像を選択</h3>
+          <span class="selected-count" id="selectedCount">{albumImageIds.length} 枚選択中</span>
+        </div>
+
+        <div class="image-picker-grid">
+          {allImages.map(img => {
+            const isInAlbum = albumImageIds.includes(img.id);
+            return (
+              <label class:list={['picker-card', { selected: isInAlbum }]}>
+                <input
+                  type="checkbox"
+                  class="picker-check"
+                  value={img.id}
+                  checked={isInAlbum}
+                  hidden
+                />
+                <div class="picker-thumb">
+                  <img src={r2Url(img.r2Key)} alt={img.title ?? ''} loading="lazy" />
+                  <div class="picker-check-mark">✓</div>
+                </div>
+                {img.title && <span class="picker-label">{img.title}</span>}
+              </label>
+            );
+          })}
+        </div>
+      </div>
+
+      {formError && <p class="form-error">{formError}</p>}
+
+      <div class="form-submit">
+        <button type="submit" class="btn btn-primary">保存</button>
+        <a href="/admin/albums" class="btn btn-ghost">キャンセル</a>
+      </div>
+    </form>
+  )}
+</AdminLayout>
+
+<style>
+  .edit-header { margin-bottom: 1.5rem; }
+
+  .back-link {
+    display: inline-block;
+    margin-bottom: 0.75rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .back-link:hover { color: var(--accent); }
+
+  .admin-section-title { border-bottom: none; margin-bottom: 0.5rem; }
+  .required { color: var(--accent); }
+  .edit-album-form { max-width: 900px; }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .image-picker-section {
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+  }
+
+  .picker-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.875rem 1rem;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .picker-title { font-size: 0.875rem; font-weight: 500; color: var(--text); letter-spacing: 0.04em; }
+  .selected-count { font-size: 0.8rem; color: var(--accent); letter-spacing: 0.04em; }
+
+  .image-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 0.5rem;
+    padding: 1rem;
+    max-height: 420px;
+    overflow-y: auto;
+    background: var(--bg);
+  }
+
+  .picker-card {
+    position: relative;
+    cursor: pointer;
+    border-radius: 2px;
+    overflow: hidden;
+    border: 2px solid transparent;
+    transition: border-color 0.15s;
+  }
+  .picker-card.selected { border-color: var(--accent); }
+
+  .picker-thumb { position: relative; aspect-ratio: 1; }
+  .picker-thumb img { width: 100%; height: 100%; object-fit: cover; transition: filter 0.2s; }
+  .picker-card.selected .picker-thumb img { filter: brightness(0.7); }
+
+  .picker-check-mark {
+    position: absolute;
+    top: 0.3rem;
+    right: 0.3rem;
+    width: 20px;
+    height: 20px;
+    background: var(--accent);
+    color: var(--bg);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .picker-card.selected .picker-check-mark { opacity: 1; }
+
+  .picker-label {
+    display: block;
+    padding: 0.25rem 0.375rem;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    background: var(--surface);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .form-error {
+    font-size: 0.85rem;
+    color: #c97070;
+    background: rgba(201, 112, 112, 0.1);
+    border: 1px solid rgba(201, 112, 112, 0.3);
+    border-radius: 2px;
+    padding: 0.625rem 0.875rem;
+    margin-bottom: 1rem;
+  }
+
+  .form-submit { display: flex; gap: 0.75rem; }
+</style>
+
+<script>
+  const imageIdsInput = document.getElementById('imageIdsInput') as HTMLInputElement;
+  const countEl = document.getElementById('selectedCount')!;
+
+  function getSelected(): string[] {
+    return [...document.querySelectorAll<HTMLInputElement>('.picker-check:checked')]
+      .map(c => c.value);
+  }
+
+  function updateHiddenInputs() {
+    const selected = getSelected();
+    imageIdsInput.value = selected.join(',');
+    countEl.textContent = `${selected.length} 枚選択中`;
+  }
+
+  document.querySelectorAll<HTMLInputElement>('.picker-check').forEach(check => {
+    check.addEventListener('change', () => {
+      check.closest('.picker-card')?.classList.toggle('selected', check.checked);
+      updateHiddenInputs();
+    });
+  });
+</script>
