@@ -1,0 +1,27 @@
+{
+	"compatibility_date": "2026-05-23",
+	"compatibility_flags": ["global_fetch_strictly_public"],
+	"name": "misosuke-site",
+	"main": "@astrojs/cloudflare/entrypoints/server",
+	"assets": {
+		"directory": "./dist",
+		"binding": "ASSETS"
+	},
+	"observability": {
+		"enabled": true
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "misosuke-db",
+			"database_id": "placeholder-replace-after-creation",
+			"migrations_dir": "drizzle/migrations"
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "BUCKET",
+			"bucket_name": "misosuke-images"
+		}
+	]
+}

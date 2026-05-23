@@ -1,0 +1,114 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getDb } from '../../db/client';
+import { albums, albumImages, images, imageTags, tags } from '../../db/schema';
+import { eq, asc, sql } from 'drizzle-orm';
+import { r2Url } from '../../lib/r2url';
+import { env } from 'cloudflare:workers';
+
+const { slug } = Astro.params;
+
+type ImageRow = typeof images.$inferSelect & { tagList: string | null };
+
+let album: typeof albums.$inferSelect | null = null;
+let imageRows: ImageRow[] = [];
+
+try {
+  const db = getDb(env.DB);
+
+  const [found] = await db.select().from(albums).where(eq(albums.slug, slug!));
+  if (!found) return Astro.redirect('/albums');
+  album = found;
+
+  const rows = await db
+    .select({
+      id: images.id,
+      title: images.title,
+      description: images.description,
+      r2Key: images.r2Key,
+      width: images.width,
+      height: images.height,
+      createdAt: images.createdAt,
+      tagList: sql<string>`group_concat(${tags.name}, ',')`,
+    })
+    .from(albumImages)
+    .innerJoin(images, eq(images.id, albumImages.imageId))
+    .leftJoin(imageTags, eq(imageTags.imageId, images.id))
+    .leftJoin(tags, eq(tags.id, imageTags.tagId))
+    .where(eq(albumImages.albumId, found.id))
+    .groupBy(images.id)
+    .orderBy(asc(albumImages.sortOrder));
+
+  imageRows = rows as ImageRow[];
+} catch { }
+
+function parseTagList(tagList: string | null): string[] {
+  if (!tagList) return [];
+  return tagList.split(',').filter(Boolean);
+}
+---
+
+<BaseLayout title={album?.title ?? 'アルバム'}>
+  {album ? (
+    <>
+      <div class="page-header">
+        <div class="album-header-back">
+          <a href="/albums" class="back-link">← アルバム一覧</a>
+        </div>
+        <h1 class="page-title">{album.title}</h1>
+        {album.description && <p class="page-subtitle">{album.description}</p>}
+        <p class="page-subtitle" style="margin-top:0.25rem">{imageRows.length} 枚</p>
+      </div>
+
+      <div class="album-content">
+        {imageRows.length === 0 ? (
+          <div class="empty-state" style="padding:4rem 0; text-align:center; color:var(--text-muted)">
+            このアルバムにはまだ画像がありません。
+          </div>
+        ) : (
+          <div class="image-grid">
+            {imageRows.map((img, i) => {
+              const tagList = parseTagList(img.tagList);
+              return (
+                <div class="image-card animate-in" style={`animation-delay:${i * 0.03}s`}>
+                  <img src={r2Url(img.r2Key)} alt={img.title ?? ''} loading={i < 6 ? 'eager' : 'lazy'} />
+                  <div class="image-card-overlay">
+                    {img.title && <span class="image-card-title">{img.title}</span>}
+                    {tagList.length > 0 && (
+                      <div class="image-card-tags">
+                        {tagList.map(t => (
+                          <a href={`/tags/${t.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '')}`} class="tag-pill">{t}</a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </>
+  ) : (
+    <div style="padding:4rem; text-align:center; color:var(--text-muted)">
+      アルバムが見つかりません。
+    </div>
+  )}
+</BaseLayout>
+
+<style>
+  .album-header-back { margin-bottom: 0.75rem; }
+
+  .back-link {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-decoration: none;
+    letter-spacing: 0.04em;
+    transition: color 0.2s;
+  }
+  .back-link:hover { color: var(--accent); }
+
+  .album-content {
+    padding: var(--gap) clamp(1.5rem, 5vw, 3rem) 3rem;
+  }
+</style>

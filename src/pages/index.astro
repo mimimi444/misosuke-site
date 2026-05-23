@@ -1,0 +1,225 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getDb } from '../db/client';
+import { images, imageTags, tags } from '../db/schema';
+import { eq, desc, sql } from 'drizzle-orm';
+import { r2Url } from '../lib/r2url';
+import { env } from 'cloudflare:workers';
+
+const PAGE_SIZE = 24;
+const page = Number(Astro.url.searchParams.get('page') ?? '1');
+const offset = (page - 1) * PAGE_SIZE;
+
+type ImageRow = typeof images.$inferSelect & { tagList: string | null };
+
+let imageRows: ImageRow[] = [];
+let totalCount = 0;
+
+try {
+  const db = getDb(env.DB);
+
+  const rows = await db
+    .select({
+      id: images.id,
+      title: images.title,
+      description: images.description,
+      r2Key: images.r2Key,
+      width: images.width,
+      height: images.height,
+      createdAt: images.createdAt,
+      tagList: sql<string>`group_concat(${tags.name}, ',')`,
+    })
+    .from(images)
+    .leftJoin(imageTags, eq(imageTags.imageId, images.id))
+    .leftJoin(tags, eq(tags.id, imageTags.tagId))
+    .groupBy(images.id)
+    .orderBy(desc(images.createdAt))
+    .limit(PAGE_SIZE)
+    .offset(offset);
+
+  imageRows = rows as ImageRow[];
+
+  const [{ count }] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(images);
+  totalCount = count;
+} catch {
+  // ローカルでD1バインディングがない場合は空表示
+}
+
+const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+
+function parseTagList(tagList: string | null): string[] {
+  if (!tagList) return [];
+  return tagList.split(',').filter(Boolean);
+}
+---
+
+<BaseLayout title="みそすけ">
+  <div class="page-header">
+    <h1 class="page-title">フィード</h1>
+    <p class="page-subtitle">{totalCount} 枚の画像</p>
+  </div>
+
+  <div class="feed-container">
+    {imageRows.length === 0 ? (
+      <div class="empty-state">
+        <p>まだ画像がありません。</p>
+        <a href="/admin/upload" class="btn btn-primary" style="margin-top:1rem">画像をアップロード</a>
+      </div>
+    ) : (
+      <div class="image-grid">
+        {imageRows.map((img, i) => {
+          const tagList = parseTagList(img.tagList);
+          return (
+            <div class="image-card animate-in" style={`animation-delay:${i * 0.03}s`}>
+              <img
+                src={r2Url(img.r2Key)}
+                alt={img.title ?? ''}
+                loading={i < 6 ? 'eager' : 'lazy'}
+              />
+              <div class="image-card-overlay">
+                {img.title && <span class="image-card-title">{img.title}</span>}
+                {tagList.length > 0 && (
+                  <div class="image-card-tags">
+                    {tagList.map(t => (
+                      <a href={`/tags/${t.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '')}`} class="tag-pill">{t}</a>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <label class="select-checkbox" aria-label="選択">
+                <input type="checkbox" class="img-select" value={img.id} />
+                <span class="checkmark"></span>
+              </label>
+            </div>
+          );
+        })}
+      </div>
+    )}
+
+    {totalPages > 1 && (
+      <nav class="pagination">
+        {page > 1 && <a href={`/?page=${page - 1}`}>← 前</a>}
+        <span class="current">{page} / {totalPages}</span>
+        {page < totalPages && <a href={`/?page=${page + 1}`}>次 →</a>}
+      </nav>
+    )}
+  </div>
+
+  <div class="album-bar" id="albumBar" aria-hidden="true">
+    <span class="album-bar-count" id="albumBarCount">0 枚選択中</span>
+    <a href="#" class="btn btn-primary" id="albumBarBtn">アルバムにまとめる</a>
+    <button class="btn btn-ghost" id="albumBarClear">選択解除</button>
+  </div>
+</BaseLayout>
+
+<style>
+  .feed-container {
+    padding: var(--gap) clamp(1.5rem, 5vw, 3rem) 3rem;
+  }
+
+  .empty-state {
+    padding: 4rem 0;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 1rem;
+  }
+
+  .select-checkbox {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    width: 22px;
+    height: 22px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .image-card:hover .select-checkbox,
+  .image-card:has(.img-select:checked) .select-checkbox {
+    opacity: 1;
+  }
+
+  .select-checkbox input { position: absolute; opacity: 0; width: 0; height: 0; }
+
+  .checkmark {
+    position: absolute;
+    inset: 0;
+    background: rgba(12, 11, 10, 0.7);
+    border: 2px solid var(--accent);
+    border-radius: 2px;
+    transition: background 0.15s;
+  }
+
+  .select-checkbox input:checked ~ .checkmark {
+    background: var(--accent);
+  }
+
+  .select-checkbox input:checked ~ .checkmark::after {
+    content: '✓';
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--bg);
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .album-bar {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(120px);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.75rem 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    z-index: 200;
+    white-space: nowrap;
+  }
+
+  .album-bar[aria-hidden="false"] {
+    transform: translateX(-50%) translateY(0);
+  }
+
+  .album-bar-count {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    min-width: 80px;
+  }
+</style>
+
+<script>
+  const checkboxes = document.querySelectorAll<HTMLInputElement>('.img-select');
+  const bar = document.getElementById('albumBar')!;
+  const countEl = document.getElementById('albumBarCount')!;
+  const btn = document.getElementById('albumBarBtn') as HTMLAnchorElement;
+  const clearBtn = document.getElementById('albumBarClear')!;
+
+  function update() {
+    const checked = [...checkboxes].filter(c => c.checked);
+    if (checked.length > 0) {
+      bar.setAttribute('aria-hidden', 'false');
+      countEl.textContent = `${checked.length} 枚選択中`;
+      btn.href = `/admin/albums/new?images=${checked.map(c => c.value).join(',')}`;
+    } else {
+      bar.setAttribute('aria-hidden', 'true');
+    }
+  }
+
+  checkboxes.forEach(cb => cb.addEventListener('change', update));
+
+  clearBtn.addEventListener('click', () => {
+    checkboxes.forEach(cb => { cb.checked = false; });
+    update();
+  });
+</script>

@@ -1,0 +1,166 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getDb } from '../../db/client';
+import { albums, albumImages } from '../../db/schema';
+import { eq, desc, sql } from 'drizzle-orm';
+import { r2Url } from '../../lib/r2url';
+import { env } from 'cloudflare:workers';
+
+type AlbumRow = typeof albums.$inferSelect & {
+  imageCount: number;
+  coverKey: string | null;
+};
+
+let albumRows: AlbumRow[] = [];
+
+try {
+  const db = getDb(env.DB);
+  const rows = await db
+    .select({
+      id: albums.id,
+      title: albums.title,
+      slug: albums.slug,
+      description: albums.description,
+      coverImageId: albums.coverImageId,
+      createdAt: albums.createdAt,
+      imageCount: sql<number>`count(${albumImages.imageId})`,
+      coverKey: sql<string | null>`(
+        SELECT r2_key FROM images
+        WHERE id = COALESCE(${albums.coverImageId},
+          (SELECT image_id FROM album_images WHERE album_id = ${albums.id} ORDER BY sort_order LIMIT 1)
+        ) LIMIT 1
+      )`,
+    })
+    .from(albums)
+    .leftJoin(albumImages, eq(albumImages.albumId, albums.id))
+    .groupBy(albums.id)
+    .orderBy(desc(albums.createdAt));
+
+  albumRows = rows as AlbumRow[];
+} catch { }
+---
+
+<BaseLayout title="アルバム">
+  <div class="page-header">
+    <h1 class="page-title">アルバム</h1>
+    <p class="page-subtitle">{albumRows.length} 件のまとめ</p>
+  </div>
+
+  <div class="albums-container">
+    {albumRows.length === 0 ? (
+      <div class="empty-state">
+        <p>アルバムがありません。</p>
+        <a href="/admin/albums/new" class="btn btn-primary" style="margin-top:1rem">アルバムを作成</a>
+      </div>
+    ) : (
+      <div class="albums-grid">
+        {albumRows.map((album, i) => (
+          <a href={`/albums/${album.slug}`} class="album-card animate-in" style={`animation-delay:${i * 0.05}s`}>
+            <div class="album-cover">
+              {album.coverKey
+                ? <img src={r2Url(album.coverKey)} alt={album.title} loading="lazy" />
+                : <div class="album-cover-placeholder">No Image</div>
+              }
+              <div class="album-count">{album.imageCount} 枚</div>
+            </div>
+            <div class="album-info">
+              <h2 class="album-title">{album.title}</h2>
+              {album.description && <p class="album-desc">{album.description}</p>}
+            </div>
+          </a>
+        ))}
+      </div>
+    )}
+  </div>
+</BaseLayout>
+
+<style>
+  .albums-container {
+    padding: var(--gap) clamp(1.5rem, 5vw, 3rem) 3rem;
+  }
+
+  .empty-state {
+    padding: 4rem 0;
+    text-align: center;
+    color: var(--text-muted);
+  }
+
+  .albums-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: clamp(1rem, 2.5vw, 1.75rem);
+  }
+
+  .album-card {
+    text-decoration: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+    transition: transform 0.25s;
+  }
+
+  .album-card:hover { transform: translateY(-3px); }
+
+  .album-cover {
+    position: relative;
+    aspect-ratio: 4/3;
+    overflow: hidden;
+    border-radius: 2px;
+    background: var(--surface);
+  }
+
+  .album-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.5s ease, filter 0.3s;
+  }
+
+  .album-card:hover .album-cover img {
+    transform: scale(1.04);
+    filter: brightness(0.85);
+  }
+
+  .album-cover-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+
+  .album-count {
+    position: absolute;
+    bottom: 0.625rem;
+    right: 0.625rem;
+    background: rgba(12, 11, 10, 0.75);
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 2px;
+    letter-spacing: 0.04em;
+  }
+
+  .album-info { padding: 0 0.25rem; }
+
+  .album-title {
+    font-family: var(--font-jp);
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--text);
+    letter-spacing: 0.04em;
+  }
+
+  .album-desc {
+    margin-top: 0.3rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+</style>
