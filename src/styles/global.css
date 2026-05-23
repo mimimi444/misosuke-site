@@ -9,11 +9,11 @@ img { display: block; max-width: 100%; }
    Variables
    ===================== */
 :root {
-  --bg: #f0f9f0;
+  --bg: #ecf1ec;
   --surface: #ffffff;
   --surface-2: #e6f4e6;
-  --border: #b4d9b4;
-  --text: #162816;
+  --border: #07a25c;
+  --text: #07a25c;
   --text-muted: #4e724e;
   --green-light: #8dd4a0;
   --green-vivid: #1a9940;
@@ -62,7 +62,7 @@ body {
   align-items: center;
   padding: 1.25rem clamp(1.5rem, 5vw, 3rem);
   border-bottom: 1px solid var(--border);
-  background: rgba(240, 249, 240, 0.88);
+  background: var(--bg);
   backdrop-filter: blur(12px);
 }
 

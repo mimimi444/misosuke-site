@@ -51,15 +51,6 @@ function parseTagList(tagList: string | null): string[] {
 <BaseLayout title={album?.title ?? 'アルバム'}>
   {album ? (
     <>
-      <div class="page-header">
-        <div class="album-header-back">
-          <a href="/albums" class="back-link">← アルバム一覧</a>
-        </div>
-        <h1 class="page-title">{album.title}</h1>
-        {album.description && <p class="page-subtitle">{album.description}</p>}
-        <p class="page-subtitle" style="margin-top:0.25rem">{imageRows.length} 枚</p>
-      </div>
-
       <div class="album-content">
         {imageRows.length === 0 ? (
           <div class="empty-state" style="padding:4rem 0; text-align:center; color:var(--text-muted)">

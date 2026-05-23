@@ -55,11 +55,7 @@ function parseTagList(tagList: string | null): string[] {
 ---
 
 <BaseLayout title={`#${tagName}`}>
-  <div class="page-header">
-    <a href="/" class="back-link">← フィード</a>
-    <h1 class="page-title"><span class="tag-prefix">#</span>{tagName}</h1>
-    <p class="page-subtitle">{imageRows.length} 枚の画像</p>
-  </div>
+
 
   <div class="tag-content">
     {imageRows.length === 0 ? (

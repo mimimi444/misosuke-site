@@ -56,11 +56,6 @@ function parseTagList(tagList: string | null): string[] {
 ---
 
 <BaseLayout title="みそすけ">
-  <div class="page-header">
-    <h1 class="page-title">フィード</h1>
-    <p class="page-subtitle">{totalCount} 枚の画像</p>
-  </div>
-
   <div class="feed-container">
     {imageRows.length === 0 ? (
       <div class="empty-state">
