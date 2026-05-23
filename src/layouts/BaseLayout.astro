@@ -1,4 +1,6 @@
 ---
+import '../styles/global.css';
+
 interface Props {
   title?: string;
   description?: string;
@@ -25,9 +27,9 @@ const isAdmin = pathname.startsWith('/admin');
 
     <header class="site-header">
       <a href="/" class="site-logo">
-      <span class="logo-main">JJJ</span>
-      <span class="logo-sub">ジャンクジャーナルジャーニー</span>
-    </a>
+        <span class="logo-main">JJJ</span>
+        <span class="logo-sub">ジャンクジャーナルジャーニー</span>
+      </a>
       <nav class="site-nav">
         <a href="/" class:list={['nav-link', { active: pathname === '/' }]}>フィード</a>
         <a href="/albums" class:list={['nav-link', { active: pathname.startsWith('/albums') }]}>アルバム</a>
@@ -46,103 +48,18 @@ const isAdmin = pathname.startsWith('/admin');
 </html>
 
 <style is:global>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { display: flex; flex-direction: column; }
+  main { flex: 1; }
 
-  :root {
-    --bg: #f0f9f0;
-    --surface: #ffffff;
-    --surface-2: #e6f4e6;
-    --border: #b4d9b4;
-    --text: #162816;
-    --text-muted: #4e724e;
-    --green-light: #8dd4a0;
-    --green-vivid: #1a9940;
-    --accent: #ff5714;
-    --accent-dim: #cc4410;
-    --font-display: 'Palette Mosaic', sans-serif;
-    --font-jp: 'Noto Sans JP', sans-serif;
-    --max-w: 1280px;
-    --gap: clamp(1rem, 2vw, 1.5rem);
-  }
-
-  html { font-size: 16px; }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--font-jp);
-    line-height: 1.7;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .grain {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 999;
-    opacity: 0.018;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    background-repeat: repeat;
-    background-size: 128px 128px;
-  }
-
-  /* Header */
-  .site-header {
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 1.25rem clamp(1.5rem, 5vw, 3rem);
-    border-bottom: 1px solid var(--border);
-    background: rgba(240, 249, 240, 0.88);
-    backdrop-filter: blur(12px);
-  }
-
-  .site-logo {
-    display: flex;
-    flex-direction: column;
-    line-height: 1;
-    text-decoration: none;
-    gap: 3px;
-    transition: opacity 0.2s;
-  }
-  .site-logo:hover { opacity: 0.75; }
-
-  .logo-main {
-    font-family: var(--font-display);
-    font-size: 1.75rem;
-    font-weight: 400;
-    color: var(--green-vivid);
-    letter-spacing: 0.04em;
-    line-height: 1;
-  }
-
-  .logo-sub {
-    font-family: var(--font-jp);
-    font-size: 12px;
-    font-weight: 400;
-    color: var(--text-muted);
-    letter-spacing: 0.06em;
-    line-height: 1;
-  }
-
+  /* 公開ナビ */
   .site-nav {
     display: flex;
     align-items: center;
     gap: 2rem;
+    margin-left: auto;
   }
 
   .nav-link {
-    font-family: var(--font-jp);
-    font-size: 0.875rem;
-    color: var(--text-muted);
-    text-decoration: none;
-    letter-spacing: 0.06em;
-    transition: color 0.2s;
     position: relative;
   }
   .nav-link::after {
@@ -155,7 +72,6 @@ const isAdmin = pathname.startsWith('/admin');
     background: var(--green-vivid);
     transition: width 0.3s ease;
   }
-  .nav-link:hover,
   .nav-link.active { color: var(--green-vivid); }
   .nav-link.active::after,
   .nav-link:hover::after { width: 100%; }
@@ -170,9 +86,8 @@ const isAdmin = pathname.startsWith('/admin');
   .nav-admin:hover { color: var(--accent-dim); border-color: var(--accent); }
   .nav-admin::after { display: none; }
 
-  /* Footer */
+  /* フッター */
   .site-footer {
-    margin-top: auto;
     padding: 2rem clamp(1.5rem, 5vw, 3rem);
     border-top: 1px solid var(--border);
     font-size: 0.75rem;
@@ -180,13 +95,7 @@ const isAdmin = pathname.startsWith('/admin');
     letter-spacing: 0.06em;
   }
 
-  main { flex: 1; }
-
-  /* Utility */
-  a { color: inherit; }
-  img { display: block; max-width: 100%; }
-
-  /* Image grid */
+  /* 画像グリッド */
   .image-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -226,7 +135,6 @@ const isAdmin = pathname.startsWith('/admin');
     opacity: 0;
     transition: opacity 0.3s;
   }
-
   .image-card:hover .image-card-overlay { opacity: 1; }
 
   .image-card-title {
@@ -255,14 +163,13 @@ const isAdmin = pathname.startsWith('/admin');
   }
   .tag-pill:hover { background: rgba(255, 87, 20, 0.95); }
 
-  /* Page header */
+  /* ページヘッダー */
   .page-header {
     padding: clamp(2rem, 5vw, 4rem) clamp(1.5rem, 5vw, 3rem) clamp(1.5rem, 3vw, 2.5rem);
     border-bottom: 1px solid var(--border);
   }
 
   .page-title {
-    font-family: var(--font-jp);
     font-size: clamp(1.5rem, 4vw, 2.5rem);
     font-weight: 700;
     color: var(--text);
@@ -277,7 +184,7 @@ const isAdmin = pathname.startsWith('/admin');
     letter-spacing: 0.04em;
   }
 
-  /* Pagination */
+  /* ページネーション */
   .pagination {
     display: flex;
     align-items: center;
@@ -297,130 +204,4 @@ const isAdmin = pathname.startsWith('/admin');
   }
   .pagination a:hover { color: var(--green-vivid); border-color: var(--green-vivid); }
   .pagination .current { color: var(--green-vivid); border-color: var(--green-vivid); }
-
-  /* Button */
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.6rem 1.25rem;
-    font-family: var(--font-jp);
-    font-size: 0.875rem;
-    letter-spacing: 0.06em;
-    border-radius: 2px;
-    cursor: pointer;
-    transition: all 0.2s;
-    border: none;
-    text-decoration: none;
-  }
-
-  .btn-primary {
-    background: var(--green-vivid);
-    color: #fff;
-    font-weight: 600;
-  }
-  .btn-primary:hover { background: #148034; }
-
-  .btn-ghost {
-    background: transparent;
-    color: var(--text-muted);
-    border: 1px solid var(--border);
-  }
-  .btn-ghost:hover { color: var(--green-vivid); border-color: var(--green-vivid); }
-
-  .btn-danger {
-    background: transparent;
-    color: #c05050;
-    border: 1px solid rgba(192, 80, 80, 0.4);
-  }
-  .btn-danger:hover { background: rgba(192, 80, 80, 0.1); }
-
-  /* Form elements */
-  .form-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-
-  label {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    letter-spacing: 0.06em;
-  }
-
-  input[type="text"],
-  input[type="email"],
-  textarea,
-  select {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 2px;
-    color: var(--text);
-    font-family: var(--font-jp);
-    font-size: 0.9rem;
-    padding: 0.625rem 0.875rem;
-    width: 100%;
-    outline: none;
-    transition: border-color 0.2s;
-  }
-
-  input:focus, textarea:focus, select:focus {
-    border-color: var(--green-vivid);
-  }
-
-  textarea { resize: vertical; min-height: 80px; }
-
-  /* Admin layout */
-  .admin-layout {
-    display: grid;
-    grid-template-columns: 200px 1fr;
-    min-height: calc(100vh - 65px);
-  }
-
-  .admin-sidebar {
-    border-right: 1px solid var(--border);
-    padding: 2rem 1.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-
-  .admin-sidebar-link {
-    display: block;
-    padding: 0.5rem 0.75rem;
-    font-size: 0.875rem;
-    color: var(--text-muted);
-    text-decoration: none;
-    border-radius: 2px;
-    letter-spacing: 0.04em;
-    transition: color 0.2s, background 0.2s;
-  }
-  .admin-sidebar-link:hover, .admin-sidebar-link.active {
-    color: var(--text);
-    background: var(--surface-2);
-  }
-  .admin-sidebar-link.active { color: var(--green-vivid); }
-
-  .admin-content {
-    padding: 2rem clamp(1.5rem, 3vw, 2.5rem);
-  }
-
-  .admin-section-title {
-    font-family: var(--font-jp);
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: var(--text);
-    margin-bottom: 1.5rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid var(--border);
-  }
-
-  @keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(12px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .animate-in {
-    animation: fadeInUp 0.5s ease both;
-  }
 </style>
