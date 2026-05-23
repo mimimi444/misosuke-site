@@ -1,6 +1,8 @@
 {
 	"compatibility_date": "2026-05-23",
-	"compatibility_flags": ["global_fetch_strictly_public"],
+	"compatibility_flags": [
+		"global_fetch_strictly_public"
+	],
 	"name": "misosuke-site",
 	"main": "@astrojs/cloudflare/entrypoints/server",
 	"assets": {
@@ -14,7 +16,7 @@
 		{
 			"binding": "DB",
 			"database_name": "misosuke-db",
-			"database_id": "placeholder-replace-after-creation",
+			"database_id": "e4698c77-5191-4894-abd6-4afd912aea85",
 			"migrations_dir": "drizzle/migrations"
 		}
 	],
