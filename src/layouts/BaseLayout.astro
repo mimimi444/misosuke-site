@@ -3,7 +3,7 @@ interface Props {
   title?: string;
   description?: string;
 }
-const { title = 'みそすけ', description = '' } = Astro.props;
+const { title = 'JJJ', description = '' } = Astro.props;
 const pathname = Astro.url.pathname;
 const isAdmin = pathname.startsWith('/admin');
 ---
@@ -14,17 +14,20 @@ const isAdmin = pathname.startsWith('/admin');
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex, nofollow" />
     {description && <meta name="description" content={description} />}
-    <title>{title === 'みそすけ' ? title : `${title} — みそすけ`}</title>
+    <title>{title === 'JJJ' ? title : `${title} — JJJ`}</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Shippori+Mincho:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet" />
   </head>
   <body>
     <div class="grain"></div>
 
     <header class="site-header">
-      <a href="/" class="site-logo">みそすけ</a>
+      <a href="/" class="site-logo">
+      <span class="logo-main">JJJ</span>
+      <span class="logo-sub">ジャンクジャーナルジャーニー</span>
+    </a>
       <nav class="site-nav">
         <a href="/" class:list={['nav-link', { active: pathname === '/' }]}>フィード</a>
         <a href="/albums" class:list={['nav-link', { active: pathname.startsWith('/albums') }]}>アルバム</a>
@@ -37,7 +40,7 @@ const isAdmin = pathname.startsWith('/admin');
     </main>
 
     <footer class="site-footer">
-      <span>みそすけ — 二次創作個人サイト</span>
+      <span>ジャンクジャーナルジャーニー — 二次創作個人サイト</span>
     </footer>
   </body>
 </html>
@@ -56,8 +59,7 @@ const isAdmin = pathname.startsWith('/admin');
     --green-vivid: #1a9940;
     --accent: #ff5714;
     --accent-dim: #cc4410;
-    --font-serif: 'EB Garamond', 'Shippori Mincho', serif;
-    --font-jp: 'Shippori Mincho', 'EB Garamond', serif;
+    --font-jp: 'Noto Sans JP', sans-serif;
     --max-w: 1280px;
     --gap: clamp(1rem, 2vw, 1.5rem);
   }
@@ -100,15 +102,32 @@ const isAdmin = pathname.startsWith('/admin');
   }
 
   .site-logo {
-    font-family: var(--font-jp);
-    font-weight: 600;
-    font-size: 1.25rem;
-    color: var(--green-vivid);
+    display: flex;
+    flex-direction: column;
+    line-height: 1;
     text-decoration: none;
-    letter-spacing: 0.08em;
-    transition: color 0.2s;
+    gap: 3px;
+    transition: opacity 0.2s;
   }
-  .site-logo:hover { color: var(--accent); }
+  .site-logo:hover { opacity: 0.75; }
+
+  .logo-main {
+    font-family: var(--font-jp);
+    font-size: 1.75rem;
+    font-weight: 900;
+    color: var(--green-vivid);
+    letter-spacing: 0.04em;
+    line-height: 1;
+  }
+
+  .logo-sub {
+    font-family: var(--font-jp);
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+    line-height: 1;
+  }
 
   .site-nav {
     display: flex;
@@ -242,9 +261,9 @@ const isAdmin = pathname.startsWith('/admin');
   }
 
   .page-title {
-    font-family: var(--font-serif);
-    font-size: clamp(1.75rem, 4vw, 3rem);
-    font-weight: 400;
+    font-family: var(--font-jp);
+    font-size: clamp(1.5rem, 4vw, 2.5rem);
+    font-weight: 700;
     color: var(--text);
     letter-spacing: 0.02em;
     line-height: 1.2;
@@ -386,9 +405,9 @@ const isAdmin = pathname.startsWith('/admin');
   }
 
   .admin-section-title {
-    font-family: var(--font-serif);
-    font-size: 1.5rem;
-    font-weight: 400;
+    font-family: var(--font-jp);
+    font-size: 1.25rem;
+    font-weight: 700;
     color: var(--text);
     margin-bottom: 1.5rem;
     padding-bottom: 0.75rem;

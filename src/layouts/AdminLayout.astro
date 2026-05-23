@@ -12,17 +12,20 @@ const pathname = Astro.url.pathname;
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex, nofollow" />
-    <title>{title} — みそすけ管理</title>
+    <title>{title} — JJJ管理</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Shippori+Mincho:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet" />
   </head>
   <body>
     <div class="grain"></div>
 
     <header class="site-header">
-      <a href="/" class="site-logo">みそすけ</a>
+      <a href="/" class="site-logo">
+        <span class="logo-main">JJJ</span>
+        <span class="logo-sub">ジャンクジャーナルジャーニー</span>
+      </a>
       <span class="admin-badge">管理画面</span>
       <nav class="site-nav">
         <a href="/" class="nav-link">← サイトへ戻る</a>
@@ -58,8 +61,7 @@ const pathname = Astro.url.pathname;
     --green-vivid: #1a9940;
     --accent: #ff5714;
     --accent-dim: #cc4410;
-    --font-serif: 'EB Garamond', 'Shippori Mincho', serif;
-    --font-jp: 'Shippori Mincho', 'EB Garamond', serif;
+    --font-jp: 'Noto Sans JP', sans-serif;
   }
 
   html { font-size: 16px; }
@@ -97,12 +99,29 @@ const pathname = Astro.url.pathname;
   }
 
   .site-logo {
-    font-family: var(--font-jp);
-    font-weight: 600;
-    font-size: 1.125rem;
-    color: var(--green-vivid);
+    display: flex;
+    flex-direction: column;
+    line-height: 1;
     text-decoration: none;
-    letter-spacing: 0.08em;
+    gap: 3px;
+  }
+
+  .logo-main {
+    font-family: var(--font-jp);
+    font-size: 1.5rem;
+    font-weight: 900;
+    color: var(--green-vivid);
+    letter-spacing: 0.04em;
+    line-height: 1;
+  }
+
+  .logo-sub {
+    font-family: var(--font-jp);
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+    line-height: 1;
   }
 
   .admin-badge {
@@ -158,9 +177,9 @@ const pathname = Astro.url.pathname;
   .admin-content { padding: 2rem clamp(1.5rem, 3vw, 2.5rem); }
 
   .admin-section-title {
-    font-family: var(--font-serif);
-    font-size: 1.5rem;
-    font-weight: 400;
+    font-family: var(--font-jp);
+    font-size: 1.25rem;
+    font-weight: 700;
     color: var(--text);
     margin-bottom: 1.5rem;
     padding-bottom: 0.75rem;
