@@ -38,12 +38,13 @@ try {
 } catch { }
 
 // フォーム処理
+let formError = '';
 if (Astro.request.method === 'POST') {
   const fd = await Astro.request.formData();
   const title = fd.get('title')?.toString() ?? '';
   const description = fd.get('description')?.toString() ?? '';
   const imageIds = fd.get('imageIds')?.toString() ?? '';
-  const coverImageId = fd.get('coverImageId')?.toString() ?? undefined;
+  const coverImageId = fd.get('coverImageId')?.toString() || undefined;
 
   const { data, error } = await Astro.callAction(actions.createAlbum, {
     title,
@@ -54,6 +55,9 @@ if (Astro.request.method === 'POST') {
 
   if (data) {
     return Astro.redirect(`/albums/${data.slug}`);
+  }
+  if (error) {
+    formError = error.message ?? 'アルバムの作成に失敗しました';
   }
 }
 
@@ -121,6 +125,8 @@ function parseTagList(tagList: string | null): string[] {
         })}
       </div>
     </div>
+
+    {formError && <p class="form-error">{formError}</p>}
 
     <div class="form-submit">
       <button type="submit" class="btn btn-primary">アルバムを作成</button>
@@ -261,6 +267,16 @@ function parseTagList(tagList: string | null): string[] {
     text-overflow: ellipsis;
   }
 
+  .form-error {
+    font-size: 0.85rem;
+    color: #c97070;
+    background: rgba(201, 112, 112, 0.1);
+    border: 1px solid rgba(201, 112, 112, 0.3);
+    border-radius: 2px;
+    padding: 0.625rem 0.875rem;
+    margin-bottom: 1rem;
+  }
+
   .form-submit {
     display: flex;
     gap: 0.75rem;
@@ -283,11 +299,9 @@ function parseTagList(tagList: string | null): string[] {
     countEl.textContent = `${selected.length} 枚選択中`;
   }
 
-  cards.forEach(card => {
-    card.addEventListener('click', () => {
-      const check = card.querySelector<HTMLInputElement>('.picker-check')!;
-      check.checked = !check.checked;
-      card.classList.toggle('selected', check.checked);
+  document.querySelectorAll<HTMLInputElement>('.picker-check').forEach(check => {
+    check.addEventListener('change', () => {
+      check.closest('.picker-card')?.classList.toggle('selected', check.checked);
       updateHiddenInputs();
     });
   });
