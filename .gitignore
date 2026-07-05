@@ -23,5 +23,8 @@ pnpm-debug.log*
 # wrangler local state
 .wrangler/state/
 
+# superpowers brainstorming sessions
+.superpowers/
+
 # jetbrains setting folder
 .idea/
