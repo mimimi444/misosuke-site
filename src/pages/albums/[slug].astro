@@ -1,14 +1,14 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { getDb } from '../../db/client';
-import { albums, albumImages, images, imageTags, tags } from '../../db/schema';
-import { eq, asc, sql } from 'drizzle-orm';
+import { albums, albumImages, images } from '../../db/schema';
+import { eq, asc } from 'drizzle-orm';
 import { r2Url } from '../../lib/r2url';
 import { env } from 'cloudflare:workers';
 
 const { slug } = Astro.params;
 
-type ImageRow = typeof images.$inferSelect & { tagList: string | null };
+type ImageRow = Pick<typeof images.$inferSelect, 'id' | 'r2Key'>;
 
 let album: typeof albums.$inferSelect | null = null;
 let imageRows: ImageRow[] = [];
@@ -20,32 +20,13 @@ try {
   if (!found) return Astro.redirect('/albums');
   album = found;
 
-  const rows = await db
-    .select({
-      id: images.id,
-      title: images.title,
-      description: images.description,
-      r2Key: images.r2Key,
-      width: images.width,
-      height: images.height,
-      createdAt: images.createdAt,
-      tagList: sql<string>`group_concat(${tags.name}, ',')`,
-    })
+  imageRows = await db
+    .select({ id: images.id, r2Key: images.r2Key })
     .from(albumImages)
     .innerJoin(images, eq(images.id, albumImages.imageId))
-    .leftJoin(imageTags, eq(imageTags.imageId, images.id))
-    .leftJoin(tags, eq(tags.id, imageTags.tagId))
     .where(eq(albumImages.albumId, found.id))
-    .groupBy(images.id)
     .orderBy(asc(albumImages.sortOrder));
-
-  imageRows = rows as ImageRow[];
 } catch { }
-
-function parseTagList(tagList: string | null): string[] {
-  if (!tagList) return [];
-  return tagList.split(',').filter(Boolean);
-}
 
 const pagesJson = JSON.stringify(
   imageRows.map(img => ({ id: String(img.id), src: r2Url(img.r2Key) }))
@@ -55,78 +36,45 @@ const pagesJson = JSON.stringify(
 <BaseLayout title={album?.title ?? 'アルバム'}>
   {album ? (
     <>
-      <div class="album-content">
-        <div class="album-header-row">
-          <h1 class="album-title">{album.title}</h1>
-          {imageRows.length > 0 && (
-            <button id="openViewerBtn" class="btn btn-primary">読む</button>
-          )}
+      {imageRows.length > 0 ? (
+        <div
+          id="viewerOverlay"
+          class="viewer-overlay"
+          data-album-slug={album.slug}
+          data-album-title={album.title ?? ''}
+          data-pages={pagesJson}
+        >
+          <button id="closeViewerBtn" class="btn btn-ghost viewer-close" aria-label="閉じる">✕</button>
+          <div class="viewer-layout">
+            <nav class="viewer-thumbs" id="viewerThumbs" aria-label="ページ一覧">
+              {imageRows.map((img, i) => (
+                <button class="viewer-thumb" data-index={String(i)}>
+                  <img src={r2Url(img.r2Key)} alt={`ページ ${i + 1}`} loading="lazy" />
+                </button>
+              ))}
+            </nav>
+            <div id="viewerContainer" class="viewer-container"></div>
+          </div>
         </div>
-
-        {imageRows.length === 0 ? (
-          <div class="empty-state" style="padding:4rem 0; text-align:center; color:var(--text-muted)">
-            このアルバムにはまだ画像がありません。
-          </div>
-        ) : (
-          <div class="image-grid">
-            {imageRows.map((img, i) => {
-              const tagList = parseTagList(img.tagList);
-              return (
-                <div class="image-card animate-in" style={`animation-delay:${i * 0.03}s`}>
-                  <img src={r2Url(img.r2Key)} alt={img.title ?? ''} loading={i < 6 ? 'eager' : 'lazy'} />
-                  <div class="image-card-overlay">
-                    {img.title && <span class="image-card-title">{img.title}</span>}
-                    {tagList.length > 0 && (
-                      <div class="image-card-tags">
-                        {tagList.map(t => (
-                          <a href={`/tags/${t.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '')}`} class="tag-pill">{t}</a>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      <div
-        id="viewerOverlay"
-        class="viewer-overlay"
-        data-album-slug={album.slug}
-        data-album-title={album.title ?? ''}
-        data-pages={pagesJson}
-        hidden
-      >
-        <button id="closeViewerBtn" class="btn btn-ghost viewer-close" aria-label="閉じる">✕</button>
-        <div id="viewerContainer" class="viewer-container"></div>
-      </div>
+      ) : (
+        <div class="empty-state">
+          <p>このアルバムにはまだ画像がありません。</p>
+          <a href="/albums" class="btn btn-ghost" style="margin-top:1rem">← アルバム一覧</a>
+        </div>
+      )}
     </>
   ) : (
-    <div style="padding:4rem; text-align:center; color:var(--text-muted)">
+    <div class="empty-state">
       アルバムが見つかりません。
     </div>
   )}
 </BaseLayout>
 
 <style>
-  .album-content {
-    padding: var(--gap) clamp(1.5rem, 5vw, 3rem) 3rem;
-  }
-
-  .album-header-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 1.5rem;
-    gap: 1rem;
-  }
-
-  .album-title {
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: var(--text);
+  .empty-state {
+    padding: 4rem;
+    text-align: center;
+    color: var(--text-muted);
   }
 
   .viewer-overlay {
@@ -138,13 +86,49 @@ const pagesJson = JSON.stringify(
     flex-direction: column;
   }
 
-  .viewer-overlay[hidden] { display: none; }
-
   .viewer-close {
     position: absolute;
-    top: 1rem;
-    right: 1rem;
+    top: 0.75rem;
+    right: 0.75rem;
     z-index: 1001;
+  }
+
+  .viewer-layout {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+
+  .viewer-thumbs {
+    width: 88px;
+    overflow-y: auto;
+    background: #0a0a0a;
+    padding: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    flex-shrink: 0;
+  }
+
+  .viewer-thumb {
+    display: block;
+    width: 100%;
+    padding: 0;
+    background: none;
+    border: 2px solid transparent;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+
+  .viewer-thumb.active { border-color: var(--accent); }
+
+  .viewer-thumb img {
+    width: 100%;
+    aspect-ratio: 3/4;
+    object-fit: cover;
+    display: block;
+    border-radius: 1px;
   }
 
   .viewer-container {
@@ -157,48 +141,57 @@ const pagesJson = JSON.stringify(
   import { createMangaViewer } from '@yui540/comimi';
 
   const overlay = document.getElementById('viewerOverlay') as HTMLDivElement | null;
-  const openBtn = document.getElementById('openViewerBtn');
   const closeBtn = document.getElementById('closeViewerBtn');
-  const container = document.getElementById('viewerContainer');
+  const thumbsEl = document.getElementById('viewerThumbs') as HTMLElement | null;
+  const container = document.getElementById('viewerContainer') as HTMLDivElement | null;
 
-  if (overlay && openBtn && closeBtn && container) {
+  if (!overlay || !closeBtn || !thumbsEl || !container) {
+    // 画像なしの場合は要素が存在しない
+  } else {
     const albumSlug = overlay.dataset.albumSlug ?? '';
     const albumTitle = overlay.dataset.albumTitle ?? '';
     const pages: Array<{ id: string; src: string }> = JSON.parse(overlay.dataset.pages ?? '[]');
 
-    let viewer: ReturnType<typeof createMangaViewer> | null = null;
-
-    openBtn.addEventListener('click', () => {
-      overlay.hidden = false;
-      viewer = createMangaViewer(container, {
-        manga: {
-          id: albumSlug,
-          title: albumTitle,
-          pages: pages.map(p => ({
-            id: p.id,
-            type: 'image' as const,
-            src: p.src,
-          })),
-        },
-        locale: 'ja',
-        settings: {
-          readingDirection: 'rtl',
-          pageTurnMode: 'single',
-          layoutMode: 'inline',
-          backgroundColor: 'black',
-        },
-        storage: { enabled: true },
+    function updateActiveThumb(pageIndex: number) {
+      thumbsEl!.querySelectorAll<HTMLElement>('.viewer-thumb').forEach((el, i) => {
+        el.classList.toggle('active', i === pageIndex);
       });
+      const active = thumbsEl!.querySelector<HTMLElement>(`.viewer-thumb[data-index="${pageIndex}"]`);
+      active?.scrollIntoView({ block: 'nearest' });
+    }
+
+    const viewer = createMangaViewer(container, {
+      manga: {
+        id: albumSlug,
+        title: albumTitle,
+        pages: pages.map(p => ({ id: p.id, type: 'image' as const, src: p.src })),
+      },
+      locale: 'ja',
+      settings: {
+        readingDirection: 'rtl',
+        pageTurnMode: 'single',
+        layoutMode: 'inline',
+        backgroundColor: 'black',
+      },
+      storage: { enabled: true },
+      events: {
+        pageChange: ({ pageIndex }: { pageIndex: number }) => updateActiveThumb(pageIndex),
+      },
+    });
+
+    // サムネクリックでページ移動
+    thumbsEl.querySelectorAll<HTMLButtonElement>('.viewer-thumb').forEach((btn, i) => {
+      btn.addEventListener('click', () => viewer.goToPage(i));
     });
 
     function closeViewer() {
-      if (viewer) { viewer.destroy(); viewer = null; }
-      overlay!.hidden = true;
+      viewer.destroy();
+      window.location.href = '/albums';
     }
 
     closeBtn.addEventListener('click', closeViewer);
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && !overlay!.hidden) closeViewer();
+      if (e.key === 'Escape') closeViewer();
     });
   }
 </script>
