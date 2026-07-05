@@ -19,6 +19,7 @@
     "@astrojs/react": "^5.0.5",
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
+    "@yui540/comimi": "^0.17.0",
     "astro": "^6.3.7",
     "drizzle-orm": "^0.45.2",
     "nanoid": "^5.1.11",
