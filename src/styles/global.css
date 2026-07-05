@@ -17,11 +17,28 @@ img { display: block; max-width: 100%; }
   --text-muted: #4e724e;
   --green-light: #8dd4a0;
   --green-vivid: #1a9940;
+  --green-shade: #13835b;
   --accent: #ff5714;
   --accent-dim: #cc4410;
   --font-display: 'Palette Mosaic', sans-serif;
   --font-jp: 'Noto Sans JP', sans-serif;
   --gap: clamp(1rem, 2vw, 1.5rem);
+  --radius-s: 24px; 
+  --radius-m: 48px;
+  --radius-l: 80px;
+  --radius-max: 9999px;
+  --font-12: 12px;
+  --font-14: 14px;
+  --font-16: 16px;
+  --font-18: 18px;
+  --font-20: 20px;
+  --font-24: 24px;
+  --font-28: 28px;
+  --font-32: 32px;
+  --font-36: 36px;
+  --font-40: 40px;
+  --font-48: 48px;
+  --font-64: 64px;
 }
 
 /* =====================
@@ -35,6 +52,10 @@ body {
   font-family: var(--font-jp);
   line-height: 1.7;
   min-height: 100vh;
+}
+
+.sp_only {
+  display: none;
 }
 
 /* =====================
@@ -60,13 +81,14 @@ body {
   z-index: 100;
   display: flex;
   align-items: center;
-  padding: 1.25rem clamp(1.5rem, 5vw, 3rem);
+  padding: 1rem clamp(1%, 2%, 1rem);
   background: linear-gradient(to bottom, rgba(0, 0, 0, 0.07) 0%, var(--bg) 100%);
 }
 
 .site-logo {
   display: flex;
   flex-direction: column;
+  align-items: center;
   line-height: 1;
   text-decoration: none;
   gap: 3px;
@@ -76,7 +98,7 @@ body {
 
 .logo-main {
   font-family: var(--font-display);
-  font-size: 1.75rem;
+  font-size: clamp(0.9rem, 1rem, 1.75rem);
   font-weight: 400;
   color: var(--green-vivid);
   letter-spacing: 0.04em;
@@ -84,11 +106,13 @@ body {
 }
 
 .logo-sub {
-  font-size: 12px;
+  font-family: var(--font-display);
+  font-size: clamp(8px, 9px, 10px);
   font-weight: 400;
-  color: var(--text-muted);
+  color: var(--green-vivid);
   letter-spacing: 0.06em;
   line-height: 1;
+  text-align: center;
 }
 
 .nav-link {
@@ -119,8 +143,14 @@ body {
   text-decoration: none;
 }
 
-.btn-primary { background: var(--green-vivid); color: #fff; font-weight: 600; }
-.btn-primary:hover { background: #148034; }
+.btn-primary {
+  background: var(--green-vivid);
+  color: var(--surface);
+  border-radius: var(--radius-max);
+  font-weight: 600;
+  transition: all .3s;
+}
+.btn-primary:hover { background: var(--green-shade); }
 
 .btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
 .btn-ghost:hover { color: var(--green-vivid); border-color: var(--green-vivid); }
@@ -158,12 +188,12 @@ textarea { resize: vertical; min-height: 80px; }
    ===================== */
 .admin-layout {
   display: grid;
-  grid-template-columns: 200px 1fr;
+  grid-template-columns: 1fr 200px;
   min-height: calc(100vh - 65px);
 }
 
 .admin-sidebar {
-  border-right: 1px solid var(--border);
+  border-left: 1px solid var(--border);
   padding: 1.5rem 1rem;
   display: flex;
   flex-direction: column;
@@ -207,3 +237,12 @@ textarea { resize: vertical; min-height: 80px; }
   to   { opacity: 1; transform: translateY(0); }
 }
 .animate-in { animation: fadeInUp 0.5s ease both; }
+
+@media (max-width:768px) {
+  .sp_only {
+    display: block;
+  }
+  .pc_only {
+    display: none;
+  }
+}

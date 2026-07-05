@@ -28,12 +28,12 @@ const isAdmin = pathname.startsWith('/admin');
     <header class="site-header">
       <a href="/" class="site-logo">
         <span class="logo-main">JJJ</span>
-        <span class="logo-sub">ジャンクジャーナルジャーニー</span>
+        <span class="logo-sub">ジャンク<br class="sp_only">ジャーナル<br class="sp_only">ジャーニー</span>
       </a>
       <nav class="site-nav">
         <a href="/" class:list={['nav-link', { active: pathname === '/' }]}>フィード</a>
         <a href="/albums" class:list={['nav-link', { active: pathname.startsWith('/albums') }]}>アルバム</a>
-        {!isAdmin && <a href="/admin" class="nav-link nav-admin">管理</a>}
+        {!isAdmin && <a href="/admin" class="nav-admin">管理</a>}
       </nav>
     </header>
 
@@ -49,42 +49,55 @@ const isAdmin = pathname.startsWith('/admin');
 
 <style is:global>
   body { display: flex; flex-direction: column; }
-  main { flex: 1; }
+  main {
+    flex: 1;
+    margin: .5rem;
+    background: var(--surface);
+    border-radius: var(--radius-s);
+  }
 
   /* 公開ナビ */
   .site-nav {
     display: flex;
     align-items: center;
-    gap: 2rem;
+    gap: .5rem;
     margin-left: auto;
   }
 
   .nav-link {
     position: relative;
+    font-size: clamp(var(--font-12), var(--font-14), var(--font-16));
+    font-weight: 600;
+
+    padding: 0.25rem 0.75rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-max);
+    transition: all .3s ease;
+
   }
-  .nav-link::after {
-    content: '';
-    position: absolute;
-    bottom: -2px;
-    left: 0;
-    width: 0;
-    height: 2px;
-    background: var(--green-vivid);
-    transition: width 0.3s ease;
+  .nav-link:hover{
+    background-color: var(--surface);
+    border-color: var(--green-vivid);
+
   }
-  .nav-link.active { color: var(--green-vivid); }
-  .nav-link.active::after,
-  .nav-link:hover::after { width: 100%; }
+  .nav-link.active { 
+    color: var(--bg);
+    border: 1px solid var(--green-vivid);
+    background-color: var(--green-vivid);
+  }
+  .nav-link.active:hover {
+    background-color: var(--green-shade);
+  }
 
   .nav-admin {
-    color: var(--accent);
-    border: 1px solid rgba(255, 87, 20, 0.35);
-    padding: 0.25rem 0.75rem;
-    border-radius: 2px;
-    font-size: 0.75rem;
+    color: var(--green-vivid);
+    padding: .05rem .25rem;
+    border-bottom: 2px dotted var(--green-vivid);
+    text-decoration: none;
   }
-  .nav-admin:hover { color: var(--accent-dim); border-color: var(--accent); }
-  .nav-admin::after { display: none; }
+  .nav-admin:hover {
+    border-bottom: 2px dotted transparent;
+  }
 
   /* フッター */
   .site-footer {

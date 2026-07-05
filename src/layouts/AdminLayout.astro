@@ -26,7 +26,7 @@ const pathname = Astro.url.pathname;
     <header class="site-header">
       <a href="/" class="site-logo">
         <span class="logo-main">JJJ</span>
-        <span class="logo-sub">ジャンクジャーナルジャーニー</span>
+        <span class="logo-sub">ジャンク<br class="sp_only">ジャーナル<br class="sp_only">ジャーニー</span>
       </a>
       <span class="admin-badge">管理画面</span>
       <nav style="margin-left: auto;">
@@ -35,16 +35,16 @@ const pathname = Astro.url.pathname;
     </header>
 
     <div class="admin-layout">
+      <div class="admin-content">
+        <slot />
+      </div>
+      
       <aside class="admin-sidebar">
         <a href="/admin" class:list={['admin-sidebar-link', { active: pathname === '/admin' }]}>ダッシュボード</a>
         <a href="/admin/upload" class:list={['admin-sidebar-link', { active: pathname === '/admin/upload' }]}>アップロード</a>
         <a href="/admin/images" class:list={['admin-sidebar-link', { active: pathname === '/admin/images' }]}>画像管理</a>
         <a href="/admin/albums" class:list={['admin-sidebar-link', { active: pathname.startsWith('/admin/albums') }]}>アルバム管理</a>
       </aside>
-
-      <div class="admin-content">
-        <slot />
-      </div>
     </div>
   </body>
 </html>
