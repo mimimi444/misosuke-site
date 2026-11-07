@@ -1,17 +1,27 @@
 import { useState, useRef, useCallback } from 'react';
+import { composePostText, countGraphemes, splitTagNames, POST_MAX_GRAPHEMES } from '../lib/social/compose';
 
 interface FileItem {
   file: File;
   previewUrl: string;
   title: string;
   tagNames: string;
+  postToBluesky: boolean;
+  attachImage: boolean;
+  includeLink: boolean;
+  postText: string;
+  /** 文面を手で編集したら true。以降はタイトルやタグに追従させない */
+  postTextEdited: boolean;
 }
 
 interface Props {
   tagSuggestions: string[];
+  siteUrl: string;
 }
 
-export default function UploadForm({ tagSuggestions }: Props) {
+type PostSetting = 'postToBluesky' | 'attachImage' | 'includeLink';
+
+export default function UploadForm({ tagSuggestions, siteUrl }: Props) {
   const [items, setItems] = useState<FileItem[]>([]);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
@@ -27,6 +37,11 @@ export default function UploadForm({ tagSuggestions }: Props) {
       previewUrl: URL.createObjectURL(f),
       title: '',
       tagNames: '',
+      postToBluesky: false,
+      attachImage: true,
+      includeLink: true,
+      postText: '',
+      postTextEdited: false,
     }));
     setItems(prev => [...prev, ...newItems]);
   }, []);
@@ -51,8 +66,29 @@ export default function UploadForm({ tagSuggestions }: Props) {
     });
   };
 
+  /** 手で編集していなければ、タイトル・タグ・リンク有無から文面を作り直す */
+  const withComposedText = (item: FileItem): FileItem => {
+    if (item.postTextEdited) return item;
+    return {
+      ...item,
+      postText: composePostText({
+        title: item.title,
+        tagNames: splitTagNames(item.tagNames),
+        url: item.includeLink ? siteUrl : null,
+      }),
+    };
+  };
+
   const updateItem = (i: number, field: 'title' | 'tagNames', value: string) => {
-    setItems(prev => prev.map((item, idx) => idx === i ? { ...item, [field]: value } : item));
+    setItems(prev => prev.map((item, idx) => idx === i ? withComposedText({ ...item, [field]: value }) : item));
+  };
+
+  const updateSetting = (i: number, field: PostSetting, value: boolean) => {
+    setItems(prev => prev.map((item, idx) => idx === i ? withComposedText({ ...item, [field]: value }) : item));
+  };
+
+  const updatePostText = (i: number, value: string) => {
+    setItems(prev => prev.map((item, idx) => idx === i ? { ...item, postText: value, postTextEdited: true } : item));
   };
 
   const handleSubmit = async () => {
@@ -66,6 +102,12 @@ export default function UploadForm({ tagSuggestions }: Props) {
       fd.append('file', item.file);
       if (item.title) fd.append('title', item.title);
       if (item.tagNames) fd.append('tagNames', item.tagNames);
+      if (item.postToBluesky) {
+        fd.append('postToBluesky', 'true');
+        fd.append('attachImage', String(item.attachImage));
+        fd.append('includeLink', String(item.includeLink));
+        fd.append('postText', item.postText);
+      }
 
       const res = await fetch('/_actions/uploadImage', { method: 'POST', body: fd });
       if (!res.ok) {
@@ -162,6 +204,55 @@ export default function UploadForm({ tagSuggestions }: Props) {
                       list="tag-suggestions"
                     />
                   </div>
+                  <fieldset className="bluesky-settings">
+                    <label className="check">
+                      <input
+                        type="checkbox"
+                        checked={item.postToBluesky}
+                        onChange={e => updateSetting(i, 'postToBluesky', e.target.checked)}
+                      />
+                      Blueskyに投稿する
+                    </label>
+                    <div className="bluesky-options">
+                      <label className="check">
+                        <input
+                          type="checkbox"
+                          checked={item.attachImage}
+                          disabled={!item.postToBluesky}
+                          onChange={e => updateSetting(i, 'attachImage', e.target.checked)}
+                        />
+                        画像を添付
+                      </label>
+                      <label className="check">
+                        <input
+                          type="checkbox"
+                          checked={item.includeLink}
+                          disabled={!item.postToBluesky}
+                          onChange={e => updateSetting(i, 'includeLink', e.target.checked)}
+                        />
+                        サイトへのリンクを含める
+                      </label>
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor={`post-text-${i}`}>文面</label>
+                      <textarea
+                        id={`post-text-${i}`}
+                        value={item.postText}
+                        disabled={!item.postToBluesky}
+                        onChange={e => updatePostText(i, e.target.value)}
+                      />
+                      {(() => {
+                        const count = countGraphemes(item.postText);
+                        const over = count > POST_MAX_GRAPHEMES;
+                        return (
+                          <p className={`post-count${over ? ' over' : ''}`} aria-live="polite">
+                            {count} / {POST_MAX_GRAPHEMES}
+                            {over && '（超えた分は投稿時に切り詰めます）'}
+                          </p>
+                        );
+                      })()}
+                    </div>
+                  </fieldset>
                 </div>
               </div>
             ))}
