@@ -8,6 +8,7 @@ import { env } from 'cloudflare:workers';
 import { formBoolean } from '../lib/form';
 import { clampPostText, composePostText, splitTagNames } from '../lib/social/compose';
 import { publishImageToBluesky } from '../lib/social/publish';
+import { storeUploadedImage } from '../lib/imageStore';
 
 export const server = {
   uploadImage: defineAction({
@@ -27,19 +28,18 @@ export const server = {
       const db = getDb(DB);
 
       const id = nanoid();
-      const ext = input.file.name.split('.').pop() ?? 'jpg';
       const now = new Date();
-      const r2Key = `images/${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${id}.${ext}`;
-
-      await BUCKET.put(r2Key, await input.file.arrayBuffer(), {
-        httpMetadata: { contentType: input.file.type },
-      });
+      // 元画像はそのまま保管し、公開用には圧縮したものを使う
+      const stored = await storeUploadedImage({ bucket: BUCKET, images: env.IMAGES, id, file: input.file, now });
 
       await db.insert(images).values({
         id,
         title: input.title || null,
         description: input.description || null,
-        r2Key,
+        r2Key: stored.r2Key,
+        originalR2Key: stored.originalR2Key,
+        width: stored.width,
+        height: stored.height,
         createdAt: now.toISOString(),
       });
 
@@ -97,7 +97,8 @@ export const server = {
       const [image] = await db.select().from(images).where(eq(images.id, input.id));
       if (!image) throw new Error('Image not found');
 
-      await BUCKET.delete(image.r2Key);
+      // 公開用と元画像（圧縮導入前の画像は同じキー）の両方を消す
+      await BUCKET.delete([...new Set([image.r2Key, image.originalR2Key ?? image.r2Key])]);
       await db.delete(images).where(eq(images.id, input.id));
     },
   }),

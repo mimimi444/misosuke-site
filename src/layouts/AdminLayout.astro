@@ -6,10 +6,9 @@ interface Props {
 }
 const { title = '管理画面' } = Astro.props;
 import { adminHref } from '../lib/adminSession';
-// 書き換え後の実体パス（/admin/...）と公開パス（/<ADMIN_PATH>/...）のどちらで来ても判定できるようにする
-const pathname = Astro.url.pathname;
-const isAt = (p: string) => pathname === '/admin' + p || pathname === adminHref(p);
-const isUnderPath = (p: string) => isAt(p) || pathname.startsWith('/admin' + p + '/') || pathname.startsWith(adminHref(p) + '/');
+const pathname = Astro.url.pathname.replace(/\/$/, '');
+const isAt = (p: string) => pathname === adminHref(p);
+const isUnderPath = (p: string) => isAt(p) || pathname.startsWith(adminHref(p) + '/');
 ---
 
 <!doctype html>

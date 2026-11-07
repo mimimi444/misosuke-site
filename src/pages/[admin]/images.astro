@@ -82,6 +82,7 @@ function parseTagList(tagList: string | null): string[] {
               <div class="edit-actions">
                 <button type="submit" class="btn btn-ghost btn-sm">保存</button>
                 <button type="button" class="btn btn-danger btn-sm delete-btn" data-id={img.id}>削除</button>
+                <a href={adminHref(`/images/${img.id}/download`)} class="btn btn-ghost btn-sm" download>元画像をダウンロード</a>
               </div>
             </form>
             <div class="image-meta">

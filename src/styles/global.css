@@ -167,6 +167,7 @@ label { font-size: 0.8rem; color: var(--text-muted); letter-spacing: 0.06em; }
 
 input[type="text"],
 input[type="email"],
+input[type="password"],
 textarea,
 select {
   background: var(--surface);
