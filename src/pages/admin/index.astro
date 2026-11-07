@@ -1,4 +1,5 @@
 ---
+import { adminHref } from '../../lib/adminSession';
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import { getDb } from '../../db/client';
 import { images, albums, tags } from '../../db/schema';
@@ -42,8 +43,8 @@ try {
   </div>
 
   <div class="quick-actions">
-    <a href="/admin/upload" class="btn btn-primary">＋ 画像をアップロード</a>
-    <a href="/admin/albums/new" class="btn btn-ghost">＋ アルバムを作成</a>
+    <a href={adminHref('/upload')} class="btn btn-primary">＋ 画像をアップロード</a>
+    <a href={adminHref('/albums/new')} class="btn btn-ghost">＋ アルバムを作成</a>
   </div>
 
   {recentImages.length > 0 && (

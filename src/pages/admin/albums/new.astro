@@ -1,4 +1,5 @@
 ---
+import { adminHref } from '../../../lib/adminSession';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { getDb } from '../../../db/client';
 import { images, imageTags, tags } from '../../../db/schema';
@@ -69,7 +70,7 @@ function parseTagList(tagList: string | null): string[] {
 
 <AdminLayout title="アルバムを作成">
   <div class="new-album-header">
-    <a href="/admin/albums" class="back-link">← アルバム一覧</a>
+    <a href={adminHref('/albums')} class="back-link">← アルバム一覧</a>
     <h2 class="admin-section-title">アルバムを作成</h2>
     {presetImageIds.length > 0 && (
       <p class="preset-notice">{presetImageIds.length} 枚の画像がプリセットされています</p>
@@ -130,7 +131,7 @@ function parseTagList(tagList: string | null): string[] {
 
     <div class="form-submit">
       <button type="submit" class="btn btn-primary">アルバムを作成</button>
-      <a href="/admin/albums" class="btn btn-ghost">キャンセル</a>
+      <a href={adminHref('/albums')} class="btn btn-ghost">キャンセル</a>
     </div>
   </form>
 </AdminLayout>

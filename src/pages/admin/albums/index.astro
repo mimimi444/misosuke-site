@@ -1,4 +1,5 @@
 ---
+import { adminHref } from '../../../lib/adminSession';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { getDb } from '../../../db/client';
 import { albums, albumImages } from '../../../db/schema';
@@ -40,13 +41,13 @@ try {
 <AdminLayout title="アルバム管理">
   <div class="albums-header">
     <h2 class="admin-section-title">アルバム管理</h2>
-    <a href="/admin/albums/new" class="btn btn-primary">＋ 新しいアルバム</a>
+    <a href={adminHref('/albums/new')} class="btn btn-primary">＋ 新しいアルバム</a>
   </div>
 
   {albumRows.length === 0 ? (
     <div class="empty-state">
       <p>アルバムがありません。</p>
-      <a href="/admin/albums/new" class="btn btn-primary" style="margin-top:1rem">作成する</a>
+      <a href={adminHref('/albums/new')} class="btn btn-primary" style="margin-top:1rem">作成する</a>
     </div>
   ) : (
     <div class="album-list">
@@ -69,7 +70,7 @@ try {
           </div>
           <div class="album-row-actions">
             <a href={`/albums/${album.slug}`} class="btn btn-ghost btn-sm" target="_blank">表示</a>
-            <a href={`/admin/albums/edit/${album.id}`} class="btn btn-ghost btn-sm">編集</a>
+            <a href={adminHref(`/albums/edit/${album.id}`)} class="btn btn-ghost btn-sm">編集</a>
             <button
               type="button"
               class="btn btn-danger btn-sm delete-btn"

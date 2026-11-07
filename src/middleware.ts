@@ -1,39 +1,42 @@
 import { defineMiddleware } from 'astro:middleware';
 import { getActionContext } from 'astro:actions';
 import { env } from 'cloudflare:workers';
-import { verifyBasicAuth } from './lib/auth';
+import { isUnder, toInternalAdminPath, validAdminPath } from './lib/adminPath';
+import { isLoggedIn } from './lib/adminSession';
 
-/** 管理画面と、フォームが POST する Astro Actions のエンドポイント */
-const PROTECTED_PREFIXES = ['/admin', '/_actions'];
+const LOGIN_PAGE = '/admin/login';
 
-function isProtected(pathname: string): boolean {
-  return PROTECTED_PREFIXES.some(
-    (prefix) => pathname === prefix || pathname.startsWith(prefix + '/'),
-  );
+function notFound(): Response {
+  return new Response('Not Found', { status: 404, headers: { 'Cache-Control': 'no-store' } });
 }
 
 export const onRequest = defineMiddleware(async (context, next) => {
+  const { pathname, search } = context.url;
+
+  // 実体のパスへの直接アクセスは、存在しないものとして扱う
+  if (isUnder(pathname, '/admin')) return notFound();
+
   // アクションは /_actions/* だけでなく、任意のページへの `?_action=名前` 付き
-  // フォーム POST からも呼べる。パスだけで判定すると公開ページ経由で素通りするので、
-  // アクション呼び出しかどうかを Astro に判定させて、それも保護対象にする。
+  // フォーム POST からも呼べる。どちらもログイン済みでなければ拒否する。
   const { action } = getActionContext(context);
-  if (!action && !isProtected(context.url.pathname)) return next();
-
-  const authorized = await verifyBasicAuth(
-    context.request.headers.get('authorization'),
-    env.ADMIN_USER,
-    env.ADMIN_PASSWORD,
-  );
-
-  if (!authorized) {
-    return new Response('Unauthorized', {
-      status: 401,
-      headers: {
-        'WWW-Authenticate': 'Basic realm="JJJ Admin", charset="UTF-8"',
-        'Cache-Control': 'no-store',
-      },
-    });
+  if (action || isUnder(pathname, '/_actions')) {
+    if (!(await isLoggedIn(context.cookies))) {
+      return new Response('Unauthorized', { status: 401, headers: { 'Cache-Control': 'no-store' } });
+    }
+    return next();
   }
 
-  return next();
+  const adminPath = validAdminPath(env.ADMIN_PATH);
+  const internal = adminPath ? toInternalAdminPath(pathname, adminPath) : null;
+  if (!internal) return next();
+
+  // ログインページだけはログイン前でも見られる
+  if (internal !== LOGIN_PAGE && !(await isLoggedIn(context.cookies))) {
+    return context.redirect(`/${adminPath}/login`, 303);
+  }
+
+  const response = await next(internal + search);
+  response.headers.set('Cache-Control', 'no-store');
+  response.headers.set('X-Robots-Tag', 'noindex, nofollow');
+  return response;
 });

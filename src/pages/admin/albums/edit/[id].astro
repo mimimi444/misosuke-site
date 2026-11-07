@@ -1,4 +1,5 @@
 ---
+import { adminHref } from '../../../../lib/adminSession';
 import AdminLayout from '../../../../layouts/AdminLayout.astro';
 import { getDb } from '../../../../db/client';
 import { albums, albumImages, images, imageTags, tags } from '../../../../db/schema';
@@ -20,7 +21,7 @@ try {
   const db = getDb(env.DB);
 
   const [found] = await db.select().from(albums).where(eq(albums.id, id!));
-  if (!found) return Astro.redirect('/admin/albums');
+  if (!found) return Astro.redirect(adminHref('/albums'));
   album = found;
 
   const currentImages = await db
@@ -67,7 +68,7 @@ if (Astro.request.method === 'POST' && album) {
   });
 
   if (!error) {
-    return Astro.redirect('/admin/albums');
+    return Astro.redirect(adminHref('/albums'));
   }
   formError = error.message ?? 'アルバムの更新に失敗しました';
 }
@@ -75,7 +76,7 @@ if (Astro.request.method === 'POST' && album) {
 
 <AdminLayout title="アルバムを編集">
   <div class="edit-header">
-    <a href="/admin/albums" class="back-link">← アルバム一覧</a>
+    <a href={adminHref('/albums')} class="back-link">← アルバム一覧</a>
     <h2 class="admin-section-title">アルバムを編集</h2>
   </div>
 
@@ -130,7 +131,7 @@ if (Astro.request.method === 'POST' && album) {
 
       <div class="form-submit">
         <button type="submit" class="btn btn-primary">保存</button>
-        <a href="/admin/albums" class="btn btn-ghost">キャンセル</a>
+        <a href={adminHref('/albums')} class="btn btn-ghost">キャンセル</a>
       </div>
     </form>
   )}

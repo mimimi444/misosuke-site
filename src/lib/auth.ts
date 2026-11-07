@@ -17,35 +17,15 @@ async function constantTimeEquals(a: string, b: string): Promise<boolean> {
   return diff === 0;
 }
 
-export async function verifyBasicAuth(
-  authHeader: string | null,
+/** ログインフォームの入力を、設定された認証情報と定数時間で照合する */
+export async function verifyCredentials(
+  user: string,
+  password: string,
   expectedUser: string,
   expectedPassword: string,
 ): Promise<boolean> {
   // 認証情報が未設定なら誰も通さない（fail closed）
-  if (!authHeader || !expectedUser || !expectedPassword) return false;
-
-  const separatorIndex = authHeader.indexOf(' ');
-  if (separatorIndex === -1) return false;
-  const scheme = authHeader.slice(0, separatorIndex);
-  const encoded = authHeader.slice(separatorIndex + 1);
-  // RFC 7235 でスキーム名は大文字小文字を区別しない
-  if (scheme.toLowerCase() !== 'basic' || !encoded) return false;
-
-  let credentials: string;
-  try {
-    const binary = atob(encoded);
-    const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
-    credentials = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-  } catch {
-    return false;
-  }
-
-  // パスワードにコロンが含まれうるので、最初のコロンだけで分割する
-  const colonIndex = credentials.indexOf(':');
-  if (colonIndex === -1) return false;
-  const user = credentials.slice(0, colonIndex);
-  const password = credentials.slice(colonIndex + 1);
+  if (!expectedUser || !expectedPassword) return false;
 
   // 片方の結果で早期 return せず、常に両方を計算する
   const [userMatches, passwordMatches] = await Promise.all([

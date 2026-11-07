@@ -7,7 +7,6 @@ interface Props {
 }
 const { title = 'JJJ', description = '' } = Astro.props;
 const pathname = Astro.url.pathname;
-const isAdmin = pathname.startsWith('/admin');
 ---
 <!doctype html>
 <html lang="ja">
@@ -33,7 +32,6 @@ const isAdmin = pathname.startsWith('/admin');
       <nav class="site-nav">
         <a href="/" class:list={['nav-link', { active: pathname === '/' }]}>フィード</a>
         <a href="/albums" class:list={['nav-link', { active: pathname.startsWith('/albums') }]}>アルバム</a>
-        {!isAdmin && <a href="/admin" class="nav-admin">管理</a>}
       </nav>
     </header>
 
@@ -87,16 +85,6 @@ const isAdmin = pathname.startsWith('/admin');
   }
   .nav-link.active:hover {
     background-color: var(--green-shade);
-  }
-
-  .nav-admin {
-    color: var(--green-vivid);
-    padding: .05rem .25rem;
-    border-bottom: 2px dotted var(--green-vivid);
-    text-decoration: none;
-  }
-  .nav-admin:hover {
-    border-bottom: 2px dotted transparent;
   }
 
   /* フッター */
