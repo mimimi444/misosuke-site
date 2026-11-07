@@ -3,6 +3,7 @@ import { nanoid } from 'nanoid';
 import type { getDb } from '../../db/client';
 import { blueskyPosts, images as imagesTable } from '../../db/schema';
 import { createBlueskyAgent, createPost, uploadBlob } from '../bluesky';
+import { withDeadline } from '../timeout';
 
 type Db = ReturnType<typeof getDb>;
 
@@ -11,6 +12,11 @@ const MAX_IMAGE_BYTES = 1_000_000;
 const RESIZE_WIDTH = 1200;
 const QUALITY_FIRST = 85;
 const QUALITY_RETRY = 60;
+/**
+ * waitUntil はレスポンス後およそ 30 秒で打ち切られ、そうなると catch も走らず pending のまま残る。
+ * その前に自分で打ち切って failed を書く。
+ */
+const PUBLISH_DEADLINE_MS = 25_000;
 
 export interface PublishParams {
   db: Db;
@@ -92,22 +98,29 @@ export async function publishImageToBluesky(params: PublishParams): Promise<void
       return;
     }
 
-    const agent = await createBlueskyAgent(params.env.identifier, params.env.appPassword);
+    const { identifier, appPassword } = params.env;
+    const post = await withDeadline(
+      (async () => {
+        const agent = await createBlueskyAgent(identifier, appPassword);
 
-    let image: { blob: Awaited<ReturnType<typeof uploadBlob>>; alt: string } | undefined;
-    let attachError: string | null = null;
-    if (params.attachImage) {
-      try {
-        const bytes = await prepareImage(params);
-        image = { blob: await uploadBlob(agent, bytes, 'image/jpeg'), alt: params.altText };
-      } catch (e) {
-        // 画像なしでも投稿自体は成功させる
-        attachError = `画像の添付に失敗: ${errorMessage(e)}`;
-      }
-    }
+        let image: { blob: Awaited<ReturnType<typeof uploadBlob>>; alt: string } | undefined;
+        let attachError: string | null = null;
+        if (params.attachImage) {
+          try {
+            const bytes = await prepareImage(params);
+            image = { blob: await uploadBlob(agent, bytes, 'image/jpeg'), alt: params.altText };
+          } catch (e) {
+            // 画像なしでも投稿自体は成功させる
+            attachError = `画像の添付に失敗: ${errorMessage(e)}`;
+          }
+        }
 
-    const post = await createPost(agent, { text: params.text, image });
-    await finish({ status: 'success', postUri: post.uri, postCid: post.cid, error: attachError });
+        return { ...(await createPost(agent, { text: params.text, image })), attachError };
+      })(),
+      PUBLISH_DEADLINE_MS,
+      `Bluesky への投稿が ${PUBLISH_DEADLINE_MS / 1000} 秒以内に終わらなかった`,
+    );
+    await finish({ status: 'success', postUri: post.uri, postCid: post.cid, error: post.attachError });
   } catch (e) {
     await finish({ status: 'failed', error: errorMessage(e) });
   }

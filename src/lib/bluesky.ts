@@ -1,11 +1,14 @@
 // Bluesky（AT Protocol）の API を知っている唯一の場所。
 import { AtpAgent, RichText, type BlobRef } from '@atproto/api';
+import { timeoutFetch } from './timeout';
 
 const SERVICE = 'https://bsky.social';
+/** 1回の通信の制限時間。応答しないまま止まるのを防ぐ */
+const REQUEST_TIMEOUT_MS = 8_000;
 
 /** アプリパスワードでログインしたエージェントを返す */
 export async function createBlueskyAgent(identifier: string, appPassword: string): Promise<AtpAgent> {
-  const agent = new AtpAgent({ service: SERVICE });
+  const agent = new AtpAgent({ service: SERVICE, fetch: timeoutFetch(REQUEST_TIMEOUT_MS) });
   await agent.login({ identifier, password: appPassword });
   return agent;
 }
