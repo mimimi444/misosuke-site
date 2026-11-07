@@ -18,6 +18,7 @@
   "dependencies": {
     "@astrojs/cloudflare": "^13.5.4",
     "@astrojs/react": "^5.0.5",
+    "@atproto/api": "^0.30.3",
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
     "@yui540/comimi": "^0.17.0",

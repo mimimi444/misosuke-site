@@ -27,5 +27,9 @@
 			"binding": "BUCKET",
 			"bucket_name": "misosuke-images"
 		}
-	]
+	],
+	// Bluesky 投稿前の画像リサイズに使う
+	"images": {
+		"binding": "IMAGES"
+	}
 }

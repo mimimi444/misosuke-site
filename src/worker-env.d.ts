@@ -3,11 +3,17 @@
 interface Env {
   ADMIN_USER: string;
   ADMIN_PASSWORD: string;
+  BLUESKY_IDENTIFIER: string;
+  BLUESKY_APP_PASSWORD: string;
 }
 
 declare namespace Cloudflare {
   interface Env {
     ADMIN_USER: string;
     ADMIN_PASSWORD: string;
+    BLUESKY_IDENTIFIER: string;
+    BLUESKY_APP_PASSWORD: string;
+  BLUESKY_IDENTIFIER: string;
+  BLUESKY_APP_PASSWORD: string;
   }
 }
