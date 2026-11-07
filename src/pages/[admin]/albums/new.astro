@@ -1,4 +1,5 @@
 ---
+import { albumHref } from '../../../lib/albumSlug';
 import { adminHref } from '../../../lib/adminSession';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { getDb } from '../../../db/client';
@@ -55,7 +56,7 @@ if (Astro.request.method === 'POST') {
   });
 
   if (data) {
-    return Astro.redirect(`/albums/${data.slug}`);
+    return Astro.redirect(albumHref(data.slug));
   }
   if (error) {
     formError = error.message ?? 'アルバムの作成に失敗しました';

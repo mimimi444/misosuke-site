@@ -11,6 +11,7 @@ import { publishImageToBluesky } from '../lib/social/publish';
 import { storeUploadedImage } from '../lib/imageStore';
 import { isAllowedUploadType } from '../lib/imageFiles';
 import { tagSlug } from '../lib/tags';
+import { albumSlug } from '../lib/albumSlug';
 
 /**
  * カンマ区切りのタグ名を画像に結び付ける。タグがなければ作る。
@@ -147,7 +148,7 @@ export const server = {
       const db = getDb(DB);
 
       const id = nanoid();
-      const slug = input.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '') + '-' + id.slice(0, 6);
+      const slug = albumSlug(input.title, id);
 
       await db.insert(albums).values({
         id,

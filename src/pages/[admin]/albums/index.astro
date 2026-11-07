@@ -1,4 +1,5 @@
 ---
+import { albumHref } from '../../../lib/albumSlug';
 import { adminHref } from '../../../lib/adminSession';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { getDb } from '../../../db/client';
@@ -69,7 +70,7 @@ try {
             </div>
           </div>
           <div class="album-row-actions">
-            <a href={`/albums/${album.slug}`} class="btn btn-ghost btn-sm" target="_blank">表示</a>
+            <a href={albumHref(album.slug)} class="btn btn-ghost btn-sm" target="_blank">表示</a>
             <a href={adminHref(`/albums/edit/${album.id}`)} class="btn btn-ghost btn-sm">編集</a>
             <button
               type="button"
