@@ -35,7 +35,9 @@ export const onRequest = defineMiddleware(async (context, next) => {
   const response = await next();
   response.headers.set('Cache-Control', 'no-store');
   response.headers.set('X-Robots-Tag', 'noindex, nofollow');
-  // 管理画面の URL（秘密のパス）を外部サイトへの Referer で漏らさない
-  response.headers.set('Referrer-Policy', 'no-referrer');
+  // 管理画面の URL（秘密のパス）を外部サイトへの Referer で漏らさない。
+  // no-referrer にするとブラウザが自サイトへの POST にも Origin: null を付け、
+  // Astro の CSRF 対策に拒否されてログインやアップロードができなくなるので same-origin にする
+  response.headers.set('Referrer-Policy', 'same-origin');
   return response;
 });
