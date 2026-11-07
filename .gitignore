@@ -34,3 +34,6 @@ pnpm-debug.log*
 
 # wrangler local state
 .wrangler/
+
+# Playwright MCP output
+.playwright-mcp/
