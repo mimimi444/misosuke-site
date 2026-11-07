@@ -34,9 +34,12 @@ export interface ComposeInput {
 }
 
 function tagLine(tagNames: string[]): string {
-  // Bluesky のタグは空白を含められないので取り除く
-  const tags = tagNames.map((name) => name.replace(/\s+/g, '')).filter(Boolean);
-  return [...new Set(tags)].map((t) => `#${t}`).join(' ');
+  // Bluesky のタグは空白を含められないので取り除く。先頭の # はこちらで付けるので外す
+  const tags = tagNames.map((name) => name.replace(/\s+/g, '').replace(/^#+/, '')).filter(Boolean);
+  // Bluesky のタグは大文字小文字を区別しないので、最初に出た表記だけを残す
+  const unique = new Map<string, string>();
+  for (const t of tags) if (!unique.has(t.toLowerCase())) unique.set(t.toLowerCase(), t);
+  return [...unique.values()].map((t) => `#${t}`).join(' ');
 }
 
 /**

@@ -28,6 +28,18 @@ describe('composePostText', () => {
     expect(composePostText({ tagNames: ['ジャンク ジャーナル', ' a　b '] })).toBe('#ジャンクジャーナル #ab');
   });
 
+  test('タグ名の先頭に付けた # は重ねない', () => {
+    expect(composePostText({ tagNames: ['#猫', '##犬'] })).toBe('#猫 #犬');
+  });
+
+  test('大文字小文字だけ違うタグは最初の表記で1つにまとめる', () => {
+    expect(composePostText({ tagNames: ['Cat', 'cat', '#CAT'] })).toBe('#Cat');
+  });
+
+  test('# だけのタグは出さない', () => {
+    expect(composePostText({ tagNames: ['#', 'a'] })).toBe('#a');
+  });
+
   test('空白だけのタグと重複したタグは出さない', () => {
     expect(composePostText({ tagNames: ['  ', 'a', 'a'] })).toBe('#a');
   });
