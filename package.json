@@ -12,7 +12,8 @@
     "astro": "astro",
     "generate-types": "wrangler types",
     "deploy": "astro build && wrangler deploy",
-    "cf:migrate": "wrangler d1 migrations apply misosuke-db --remote"
+    "cf:migrate": "wrangler d1 migrations apply misosuke-db --remote",
+    "test": "vitest run"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^13.5.4",
@@ -33,6 +34,7 @@
   "devDependencies": {
     "@astrojs/check": "^0.9.9",
     "drizzle-kit": "^0.31.10",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.3"
   }
 }
