@@ -87,6 +87,10 @@ export default function UploadForm({ tagSuggestions, siteUrl }: Props) {
     setItems(prev => prev.map((item, idx) => idx === i ? withComposedText({ ...item, [field]: value }) : item));
   };
 
+  const resetPostText = (i: number) => {
+    setItems(prev => prev.map((item, idx) => idx === i ? withComposedText({ ...item, postTextEdited: false }) : item));
+  };
+
   const updatePostText = (i: number, value: string) => {
     setItems(prev => prev.map((item, idx) => idx === i ? { ...item, postText: value, postTextEdited: true } : item));
   };
@@ -227,7 +231,8 @@ export default function UploadForm({ tagSuggestions, siteUrl }: Props) {
                         <input
                           type="checkbox"
                           checked={item.includeLink}
-                          disabled={!item.postToBluesky}
+                          // 手で編集した文面にはリンクの有無を反映できないので、操作させない
+                          disabled={!item.postToBluesky || item.postTextEdited}
                           onChange={e => updateSetting(i, 'includeLink', e.target.checked)}
                         />
                         サイトへのリンクを含める
@@ -241,6 +246,14 @@ export default function UploadForm({ tagSuggestions, siteUrl }: Props) {
                         disabled={!item.postToBluesky}
                         onChange={e => updatePostText(i, e.target.value)}
                       />
+                      {item.postToBluesky && item.postTextEdited && (
+                        <p className="post-edited-note">
+                          文面を手で編集しています。リンクは文面の中で直接編集してください。
+                          <button type="button" className="btn-link" onClick={() => resetPostText(i)}>
+                            自動作成に戻す
+                          </button>
+                        </p>
+                      )}
                       {(() => {
                         const count = countGraphemes(item.postText);
                         const over = count > POST_MAX_GRAPHEMES;
