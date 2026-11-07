@@ -1,4 +1,5 @@
 import { defineMiddleware } from 'astro:middleware';
+import { getActionContext } from 'astro:actions';
 import { env } from 'cloudflare:workers';
 import { verifyBasicAuth } from './lib/auth';
 
@@ -12,7 +13,11 @@ function isProtected(pathname: string): boolean {
 }
 
 export const onRequest = defineMiddleware(async (context, next) => {
-  if (!isProtected(context.url.pathname)) return next();
+  // アクションは /_actions/* だけでなく、任意のページへの `?_action=名前` 付き
+  // フォーム POST からも呼べる。パスだけで判定すると公開ページ経由で素通りするので、
+  // アクション呼び出しかどうかを Astro に判定させて、それも保護対象にする。
+  const { action } = getActionContext(context);
+  if (!action && !isProtected(context.url.pathname)) return next();
 
   const authorized = await verifyBasicAuth(
     context.request.headers.get('authorization'),
