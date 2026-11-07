@@ -35,3 +35,15 @@ export const albumImages = sqliteTable('album_images', {
   imageId: text('image_id').notNull().references(() => images.id, { onDelete: 'cascade' }),
   sortOrder: integer('sort_order').notNull().default(0),
 }, (t) => [primaryKey({ columns: [t.albumId, t.imageId] })]);
+
+export const blueskyPosts = sqliteTable('bluesky_posts', {
+  id: text('id').primaryKey(),
+  imageId: text('image_id').notNull().references(() => images.id, { onDelete: 'cascade' }),
+  status: text('status').notNull(), // 'pending' | 'success' | 'failed'
+  text: text('text').notNull(), // 実際に投稿した本文
+  postUri: text('post_uri'), // at:// URI（成功時）
+  postCid: text('post_cid'), // CID（成功時）
+  error: text('error'), // エラー内容（失敗時）
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
