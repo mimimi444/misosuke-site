@@ -1,10 +1,12 @@
-import { sqliteTable, text, integer, primaryKey } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, primaryKey, index } from 'drizzle-orm/sqlite-core';
 
 export const images = sqliteTable('images', {
   id: text('id').primaryKey(),
   title: text('title'),
   description: text('description'),
   r2Key: text('r2_key').notNull(),
+  // フルサイズの元画像。r2Key は公開用に圧縮したもの。圧縮導入前の画像は両方同じキー
+  originalR2Key: text('original_r2_key'),
   width: integer('width'),
   height: integer('height'),
   createdAt: text('created_at').notNull(),
@@ -47,3 +49,10 @@ export const blueskyPosts = sqliteTable('bluesky_posts', {
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 });
+
+/** 管理画面へのログイン試行。回数制限のために IP ごとの時刻を記録する */
+export const loginAttempts = sqliteTable('login_attempts', {
+  id: text('id').primaryKey(),
+  ip: text('ip').notNull(),
+  attemptedAt: integer('attempted_at').notNull(), // ミリ秒
+}, (t) => [index('login_attempts_ip_at').on(t.ip, t.attemptedAt)]);
