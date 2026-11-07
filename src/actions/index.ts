@@ -5,6 +5,9 @@ import { images, tags, imageTags, albums, albumImages } from '../db/schema';
 import { nanoid } from 'nanoid';
 import { eq, inArray } from 'drizzle-orm';
 import { env } from 'cloudflare:workers';
+import { formBoolean } from '../lib/form';
+import { clampPostText, composePostText, splitTagNames } from '../lib/social/compose';
+import { publishImageToBluesky } from '../lib/social/publish';
 
 export const server = {
   uploadImage: defineAction({
@@ -14,8 +17,12 @@ export const server = {
       title: z.string().optional(),
       description: z.string().optional(),
       tagNames: z.string().optional(),
+      postToBluesky: formBoolean,
+      attachImage: formBoolean,
+      includeLink: formBoolean,
+      postText: z.string().optional(),
     }),
-    handler: async (input) => {
+    handler: async (input, context) => {
       const { DB, BUCKET } = env;
       const db = getDb(DB);
 
@@ -47,6 +54,34 @@ export const server = {
             await db.insert(imageTags).values({ imageId: id, tagId: tag.id }).onConflictDoNothing();
           }
         }
+      }
+
+      if (input.postToBluesky) {
+        const edited = input.postText?.trim();
+        const text = edited
+          ? clampPostText(edited)
+          : composePostText({
+              title: input.title,
+              description: input.description,
+              tagNames: splitTagNames(input.tagNames),
+              url: input.includeLink ? context.site?.href ?? null : null,
+            });
+        // 投稿の完了は待たずに返す。失敗は bluesky_posts に記録される
+        context.locals.cfContext.waitUntil(
+          publishImageToBluesky({
+            db,
+            bucket: BUCKET,
+            images: env.IMAGES,
+            imageId: id,
+            text,
+            attachImage: input.attachImage,
+            altText: input.title ?? '',
+            env: {
+              identifier: env.BLUESKY_IDENTIFIER ?? '',
+              appPassword: env.BLUESKY_APP_PASSWORD ?? '',
+            },
+          }),
+        );
       }
 
       return { id };

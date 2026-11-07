@@ -5,6 +5,8 @@ test.each([
   ['true', true],
   ['false', false],
   [undefined, false],
+  // Astro はフォームにない項目を null として渡す
+  [null, false],
 ])('formBoolean(%s) は %s', (input, expected) => {
   expect(formBoolean.parse(input)).toBe(expected);
 });
