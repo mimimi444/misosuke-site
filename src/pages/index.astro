@@ -5,6 +5,9 @@ import { images, imageTags, tags } from '../db/schema';
 import { eq, desc, sql } from 'drizzle-orm';
 import { r2Url } from '../lib/r2url';
 import { env } from 'cloudflare:workers';
+import AlbumViewer from '../components/AlbumViewer.astro';
+import Lightbox from '../components/Lightbox.astro';
+import { loadImageAlbums } from '../lib/feedAlbums';
 
 const PAGE_SIZE = 24;
 const page = Number(Astro.url.searchParams.get('page') ?? '1');
@@ -14,6 +17,8 @@ type ImageRow = typeof images.$inferSelect & { tagList: string | null };
 
 let imageRows: ImageRow[] = [];
 let totalCount = 0;
+/** 画像 ID → ビューワーで開くアルバムの slug（2 ページ以上のアルバムに入っている画像だけ） */
+let imageAlbums = new Map<string, string>();
 
 try {
   const db = getDb(env.DB);
@@ -43,6 +48,8 @@ try {
     .select({ count: sql<number>`count(*)` })
     .from(images);
   totalCount = count;
+
+  imageAlbums = await loadImageAlbums(db, imageRows.map(r => r.id));
 } catch {
   // ローカルでD1バインディングがない場合は空表示
 }
@@ -67,6 +74,15 @@ function parseTagList(tagList: string | null): string[] {
           const tagList = parseTagList(img.tagList);
           return (
             <div class="image-card animate-in" style={`animation-delay:${i * 0.03}s`}>
+              <button
+                type="button"
+                class="image-open"
+                data-image-id={img.id}
+                data-src={r2Url(img.r2Key)}
+                data-title={img.title ?? ''}
+                data-album={imageAlbums.get(img.id)}
+                aria-label={`${img.title || '画像'}を${imageAlbums.has(img.id) ? 'アルバムで' : '拡大して'}表示`}
+              ></button>
               <img
                 src={r2Url(img.r2Key)}
                 alt={img.title ?? ''}
@@ -97,7 +113,23 @@ function parseTagList(tagList: string | null): string[] {
     )}
   </div>
 
+  <AlbumViewer />
+  <Lightbox />
 </BaseLayout>
+
+<script>
+  import { openAlbumViewer } from '../lib/albumViewer';
+  import { openLightbox } from '../lib/lightbox';
+
+  // 2 ページ以上のアルバムに入っている画像はそのページからビューワーで、それ以外はライトボックスで開く
+  document.querySelectorAll<HTMLButtonElement>('.image-open').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const { album, imageId, src, title } = btn.dataset;
+      if (album && (await openAlbumViewer(album, imageId))) return;
+      openLightbox(src!, title ?? '');
+    });
+  });
+</script>
 
 <style>
   .feed-container {

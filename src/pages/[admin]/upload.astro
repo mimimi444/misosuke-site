@@ -1,5 +1,4 @@
 ---
-import { adminHref } from '../../lib/adminSession';
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import { getDb } from '../../db/client';
 import { tags } from '../../db/schema';
@@ -17,7 +16,7 @@ try {
 
 <AdminLayout title="アップロード">
   <h2 class="admin-section-title">画像アップロード</h2>
-  <UploadForm tagSuggestions={tagSuggestions} siteUrl={Astro.site?.href ?? ''} imagesHref={adminHref('/images')} client:load />
+  <UploadForm tagSuggestions={tagSuggestions} siteUrl={Astro.site?.href ?? ''} client:load />
 </AdminLayout>
 
 <style>

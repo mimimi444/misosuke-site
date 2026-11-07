@@ -3,6 +3,7 @@ import { getActionContext } from 'astro:actions';
 import { env } from 'cloudflare:workers';
 import { isUnder, validAdminPath } from './lib/adminPath';
 import { isLoggedIn } from './lib/adminSession';
+import { SESSION_COOKIE } from './lib/session';
 
 // 管理画面のページは src/pages/[admin]/ にある。先頭の [admin] が秘密の ADMIN_PATH と
 // 一致するときだけ通し、それ以外（/admin や当て推量の文字列）は存在しないものとして扱う。
@@ -22,7 +23,14 @@ export const onRequest = defineMiddleware(async (context, next) => {
     return next();
   }
 
-  if (!isUnder(context.routePattern, ADMIN_ROUTE_PREFIX)) return next();
+  if (!isUnder(context.routePattern, ADMIN_ROUTE_PREFIX)) {
+    const response = await next();
+    // ログイン中は公開ページにも管理画面へのリンク（秘密の URL）が入るので、共有キャッシュに載せない
+    // （画像などはリンクを含まないので、HTML だけ）
+    const isHtml = response.headers.get('Content-Type')?.startsWith('text/html');
+    if (isHtml && context.cookies.has(SESSION_COOKIE)) response.headers.set('Cache-Control', 'private, no-store');
+    return response;
+  }
 
   const adminPath = validAdminPath(env.ADMIN_PATH);
   if (!adminPath || context.params.admin !== adminPath) return noStore(404, 'Not Found');

@@ -17,13 +17,11 @@ interface FileItem {
 interface Props {
   tagSuggestions: string[];
   siteUrl: string;
-  /** アップロード完了後に移動する画像管理ページの URL */
-  imagesHref: string;
 }
 
 type PostSetting = 'postToBluesky' | 'attachImage' | 'includeLink';
 
-export default function UploadForm({ tagSuggestions, siteUrl, imagesHref }: Props) {
+export default function UploadForm({ tagSuggestions, siteUrl }: Props) {
   const [items, setItems] = useState<FileItem[]>([]);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
@@ -131,8 +129,9 @@ export default function UploadForm({ tagSuggestions, siteUrl, imagesHref }: Prop
       setProgress({ done, total: items.length });
     }
 
-    setMessage(`${done} 枚のアップロードが完了しました`);
-    setTimeout(() => { window.location.href = imagesHref; }, 1200);
+    setMessage(`${done} 枚のアップロードが完了しました。フィードに移動します`);
+    // アップロードした画像が公開側でどう見えるかを確かめられるよう、フィードに移る
+    setTimeout(() => { window.location.href = '/'; }, 1200);
   };
 
   const handleClear = () => {
