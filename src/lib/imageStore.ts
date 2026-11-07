@@ -9,27 +9,34 @@ export interface StoredImage {
   height: number | null;
 }
 
-async function compress(images: ImagesBinding, bytes: ArrayBuffer): Promise<ArrayBuffer> {
-  const { width, height } = await dimensions(images, bytes);
-  let transformer = images.input(new Blob([bytes]).stream());
-  // 長辺が上限を超えるときだけ縮小する（拡大はしない。開発環境では scale-down が効かないことがあるため自前で判定する）
-  if (width === null || height === null) {
-    transformer = transformer.transform({ width: COMPRESS.maxEdge, height: COMPRESS.maxEdge, fit: 'scale-down' });
-  } else if (Math.max(width, height) > COMPRESS.maxEdge) {
-    // 長辺だけを指定して縦横比を保つ
-    transformer = transformer.transform(width >= height ? { width: COMPRESS.maxEdge } : { height: COMPRESS.maxEdge });
-  }
-  const result = await transformer.output({ format: COMPRESS.format, quality: COMPRESS.quality });
-  return result.response().arrayBuffer();
+interface Size {
+  width: number | null;
+  height: number | null;
 }
 
-async function dimensions(images: ImagesBinding, bytes: ArrayBuffer): Promise<{ width: number | null; height: number | null }> {
+// Workers のメモリは 128MB しかないので、大きな画像を arrayBuffer() や Blob で何度も複製しない。
+// File はそのまま R2 に渡し、Images には stream() で流す。
+
+async function measure(images: ImagesBinding, stream: ReadableStream<Uint8Array>): Promise<Size> {
   try {
-    const info = await images.info(new Blob([bytes]).stream());
+    const info = await images.info(stream);
     return 'width' in info ? { width: info.width, height: info.height } : { width: null, height: null };
   } catch {
     return { width: null, height: null };
   }
+}
+
+async function compress(images: ImagesBinding, file: File, size: Size): Promise<ArrayBuffer> {
+  let transformer = images.input(file.stream());
+  // 長辺が上限を超えるときだけ縮小する（拡大はしない。開発環境では scale-down が効かないことがあるため自前で判定する）
+  if (size.width === null || size.height === null) {
+    transformer = transformer.transform({ width: COMPRESS.maxEdge, height: COMPRESS.maxEdge, fit: 'scale-down' });
+  } else if (Math.max(size.width, size.height) > COMPRESS.maxEdge) {
+    // 長辺だけを指定して縦横比を保つ
+    transformer = transformer.transform(size.width >= size.height ? { width: COMPRESS.maxEdge } : { height: COMPRESS.maxEdge });
+  }
+  const result = await transformer.output({ format: COMPRESS.format, quality: COMPRESS.quality });
+  return result.response().arrayBuffer();
 }
 
 /**
@@ -45,24 +52,28 @@ export async function storeUploadedImage(params: {
 }): Promise<StoredImage> {
   const { bucket, images, id, file, now } = params;
   const { originalKey, displayKey } = imageKeys(id, file.name, now);
-  const original = await file.arrayBuffer();
+  const meta = { httpMetadata: { contentType: file.type } };
 
-  await bucket.put(originalKey, original, { httpMetadata: { contentType: file.type } });
+  await bucket.put(originalKey, file, meta);
+  const originalSize = await measure(images, file.stream());
 
-  let display: { key: string; bytes: ArrayBuffer; type: string } | null = null;
   if (shouldCompress(file.type)) {
     try {
-      const compressed = await compress(images, original);
-      if (compressed.byteLength < original.byteLength) {
-        display = { key: displayKey, bytes: compressed, type: COMPRESS.format };
+      const compressed = await compress(images, file, originalSize);
+      if (compressed.byteLength < file.size) {
+        await bucket.put(displayKey, compressed, { httpMetadata: { contentType: COMPRESS.format } });
+        return {
+          r2Key: displayKey,
+          originalR2Key: originalKey,
+          ...(await measure(images, new Blob([compressed]).stream())),
+        };
       }
     } catch (e) {
       console.error('画像の圧縮に失敗したので元画像を公開用にする', e);
     }
   }
-  display ??= { key: originalKey.replace(/^originals\//, 'images/'), bytes: original, type: file.type };
 
-  await bucket.put(display.key, display.bytes, { httpMetadata: { contentType: display.type } });
-
-  return { r2Key: display.key, originalR2Key: originalKey, ...(await dimensions(images, display.bytes)) };
+  const fallbackKey = originalKey.replace(/^originals\//, 'images/');
+  await bucket.put(fallbackKey, file, meta);
+  return { r2Key: fallbackKey, originalR2Key: originalKey, ...originalSize };
 }

@@ -1,0 +1,1 @@
+CREATE INDEX `login_attempts_at` ON `login_attempts` (`attempted_at`);

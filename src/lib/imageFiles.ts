@@ -16,6 +16,13 @@ export function imageKeys(id: string, fileName: string, now: Date): { originalKe
   };
 }
 
+/**
+ * アップロードを受け付ける形式。SVG や HTML は自サイトのドメインで配るとスクリプトが動きうるので拒否する。
+ */
+export function isAllowedUploadType(mimeType: string): boolean {
+  return /^image\/(jpeg|png|webp|gif|avif|heic|heif)$/.test(mimeType);
+}
+
 /** 圧縮してよい形式か。GIF はアニメーションが消え、SVG はベクターなので元のまま使う */
 export function shouldCompress(mimeType: string): boolean {
   return /^image\/(jpeg|png|webp|avif|heic|heif)$/.test(mimeType);
@@ -29,7 +36,8 @@ export function isPublicImageKey(key: string): boolean {
 
 /** ダウンロード用の Content-Disposition。日本語のファイル名は filename* で渡す */
 export function contentDisposition(title: string | null | undefined, id: string, originalKey: string): string {
-  const ext = originalKey.split('.').pop() ?? 'bin';
+  // 圧縮導入前の画像のキーは拡張子が未加工なので、ここでも英数字だけにする
+  const ext = (originalKey.split('.').pop() ?? '').toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin';
   const base = (title?.trim() || id).replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_');
   const encoded = encodeURIComponent(`${base}.${ext}`).replace(/['()*]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
   return `attachment; filename="${id}.${ext}"; filename*=UTF-8''${encoded}`;

@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { imageKeys, shouldCompress, isPublicImageKey, contentDisposition, COMPRESS } from './imageFiles';
+import { imageKeys, shouldCompress, isPublicImageKey, contentDisposition, isAllowedUploadType, COMPRESS } from './imageFiles';
 
 const NOW = new Date('2026-11-07T09:00:00Z');
 
@@ -50,6 +50,12 @@ describe('contentDisposition', () => {
       `attachment; filename="abc123.png"; filename*=UTF-8''abc123.png`,
     );
   });
+  test('古い画像のキーに残る拡張子も、ヘッダーを壊さないよう英数字だけにする', () => {
+    expect(contentDisposition('t', 'x', 'images/2026/05/x.jp"g; a=b')).toBe(
+      `attachment; filename="x.jpgab"; filename*=UTF-8''t.jpgab`,
+    );
+  });
+
   test('ファイル名に使えない文字は _ に置き換える', () => {
     expect(contentDisposition('a/b\\c:"d"', 'x', 'originals/x.jpg')).toContain(`filename*=UTF-8''a_b_c__d_.jpg`);
   });
@@ -57,4 +63,15 @@ describe('contentDisposition', () => {
 
 test('圧縮の設定は長辺 2000px・WebP 品質 80', () => {
   expect(COMPRESS).toEqual({ maxEdge: 2000, format: 'image/webp', quality: 80 });
+});
+
+describe('isAllowedUploadType', () => {
+  test('写真・画像の形式だけを受け付ける', () => {
+    for (const t of ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif', 'image/heic', 'image/heif'])
+      expect(isAllowedUploadType(t)).toBe(true);
+  });
+  test('自サイトで配るとスクリプトが動きうる形式は拒否する', () => {
+    for (const t of ['image/svg+xml', 'text/html', 'application/octet-stream', '', 'image/jpeg; x=1'])
+      expect(isAllowedUploadType(t)).toBe(false);
+  });
 });

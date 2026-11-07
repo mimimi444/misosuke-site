@@ -1,4 +1,4 @@
-import { defineAction } from 'astro:actions';
+import { ActionError, defineAction } from 'astro:actions';
 import { z } from 'astro:schema';
 import { getDb } from '../db/client';
 import { images, tags, imageTags, albums, albumImages } from '../db/schema';
@@ -9,6 +9,7 @@ import { formBoolean } from '../lib/form';
 import { clampPostText, composePostText, splitTagNames } from '../lib/social/compose';
 import { publishImageToBluesky } from '../lib/social/publish';
 import { storeUploadedImage } from '../lib/imageStore';
+import { isAllowedUploadType } from '../lib/imageFiles';
 
 export const server = {
   uploadImage: defineAction({
@@ -26,6 +27,10 @@ export const server = {
     handler: async (input, context) => {
       const { DB, BUCKET } = env;
       const db = getDb(DB);
+
+      if (!isAllowedUploadType(input.file.type)) {
+        throw new ActionError({ code: 'BAD_REQUEST', message: `対応していない形式です: ${input.file.type || '不明'}` });
+      }
 
       const id = nanoid();
       const now = new Date();

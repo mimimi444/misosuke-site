@@ -120,7 +120,9 @@ export default function UploadForm({ tagSuggestions, siteUrl, imagesHref }: Prop
         setMessage(
           res.status === 413
             ? `エラー: ${item.file.name} はファイルサイズが大きすぎます（上限 25MB）`
-            : `エラー: ${item.file.name} のアップロードに失敗しました（${res.status}）`,
+            : res.status === 400
+              ? `エラー: ${item.file.name} は対応していない形式です（JPG / PNG / WebP / GIF / AVIF / HEIC）`
+              : `エラー: ${item.file.name} のアップロードに失敗しました（${res.status}）`,
         );
         setUploading(false);
         return;

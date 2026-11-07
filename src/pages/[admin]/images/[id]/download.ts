@@ -19,5 +19,6 @@ export const GET: APIRoute = async ({ params }) => {
   headers.set('Content-Disposition', contentDisposition(image.title, image.id, key));
   headers.set('Content-Length', String(obj.size));
   headers.set('Cache-Control', 'private, no-store');
+  headers.set('X-Content-Type-Options', 'nosniff');
   return new Response(obj.body, { headers });
 };

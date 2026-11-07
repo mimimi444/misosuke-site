@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { decideLoginAttempt, LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_MS } from './rateLimit';
+import { decideLoginAttempt, rateLimitKey, LOGIN_MAX_ATTEMPTS, LOGIN_GLOBAL_MAX_ATTEMPTS, LOGIN_WINDOW_MS } from './rateLimit';
 
 const NOW = 1_800_000_000_000;
 const ago = (ms: number) => NOW - ms;
@@ -25,4 +25,29 @@ describe('decideLoginAttempt', () => {
     const recent = Array.from({ length: 9 }, (_, i) => ago(i));
     expect(decideLoginAttempt([...old, ...recent], NOW).allowed).toBe(true);
   });
+});
+
+describe('rateLimitKey', () => {
+  test('IPv4 はアドレスごとに数える', () => {
+    expect(rateLimitKey('203.0.113.7')).toBe('203.0.113.7');
+  });
+
+  test('IPv6 は先頭 /64 でまとめる（アドレスを替えて回避させない）', () => {
+    expect(rateLimitKey('2001:db8:1:2:aaaa:bbbb:cccc:dddd')).toBe('2001:db8:1:2::/64');
+    expect(rateLimitKey('2001:db8:1:2::1')).toBe('2001:db8:1:2::/64');
+    expect(rateLimitKey('2001:DB8:1:2::ffff')).toBe('2001:db8:1:2::/64');
+  });
+
+  test('省略表記の IPv6 も展開してから /64 を取る', () => {
+    expect(rateLimitKey('2001:db8::1')).toBe('2001:db8:0:0::/64');
+    expect(rateLimitKey('::1')).toBe('0:0:0:0::/64');
+  });
+
+  test('空や不明はまとめて 1 つのキーにする', () => {
+    expect(rateLimitKey('')).toBe('unknown');
+  });
+});
+
+test('サイト全体でも 5 分間に 100 回まで', () => {
+  expect(LOGIN_GLOBAL_MAX_ATTEMPTS).toBe(100);
 });

@@ -55,4 +55,8 @@ export const loginAttempts = sqliteTable('login_attempts', {
   id: text('id').primaryKey(),
   ip: text('ip').notNull(),
   attemptedAt: integer('attempted_at').notNull(), // ミリ秒
-}, (t) => [index('login_attempts_ip_at').on(t.ip, t.attemptedAt)]);
+}, (t) => [
+  index('login_attempts_ip_at').on(t.ip, t.attemptedAt),
+  // 古い記録の削除とサイト全体の件数で使う
+  index('login_attempts_at').on(t.attemptedAt),
+]);
