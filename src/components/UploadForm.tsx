@@ -115,7 +115,11 @@ export default function UploadForm({ tagSuggestions, siteUrl }: Props) {
 
       const res = await fetch('/_actions/uploadImage', { method: 'POST', body: fd });
       if (!res.ok) {
-        setMessage(`エラー: ${item.file.name} のアップロードに失敗しました`);
+        setMessage(
+          res.status === 413
+            ? `エラー: ${item.file.name} はファイルサイズが大きすぎます（上限 25MB）`
+            : `エラー: ${item.file.name} のアップロードに失敗しました（${res.status}）`,
+        );
         setUploading(false);
         return;
       }
@@ -148,6 +152,7 @@ export default function UploadForm({ tagSuggestions, siteUrl }: Props) {
 
   return (
     <div className="upload-area">
+      {message && <p className="upload-message" role="alert">{message}</p>}
       <div
         className={`drop-zone${dragging ? ' drag-over' : ''}`}
         onClick={() => fileInputRef.current?.click()}
