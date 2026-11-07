@@ -10,6 +10,21 @@ import { clampPostText, composePostText, splitTagNames } from '../lib/social/com
 import { publishImageToBluesky } from '../lib/social/publish';
 import { storeUploadedImage } from '../lib/imageStore';
 import { isAllowedUploadType } from '../lib/imageFiles';
+import { tagSlug } from '../lib/tags';
+
+/**
+ * カンマ区切りのタグ名を画像に結び付ける。タグがなければ作る。
+ * slug は tagSlug() で作る（日本語のタグも別々の slug になる）。記号だけのタグ名は捨てる。
+ */
+async function attachTags(db: ReturnType<typeof getDb>, imageId: string, rawTagNames: string) {
+  for (const name of splitTagNames(rawTagNames)) {
+    const slug = tagSlug(name);
+    if (!slug) continue;
+    await db.insert(tags).values({ id: nanoid(), name, slug }).onConflictDoNothing();
+    const [tag] = await db.select().from(tags).where(eq(tags.slug, slug));
+    if (tag) await db.insert(imageTags).values({ imageId, tagId: tag.id }).onConflictDoNothing();
+  }
+}
 
 export const server = {
   uploadImage: defineAction({
@@ -48,18 +63,7 @@ export const server = {
         createdAt: now.toISOString(),
       });
 
-      if (input.tagNames) {
-        const names = input.tagNames.split(',').map(s => s.trim()).filter(Boolean);
-        for (const name of names) {
-          const slug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
-          const tagId = nanoid();
-          await db.insert(tags).values({ id: tagId, name, slug }).onConflictDoNothing();
-          const [tag] = await db.select().from(tags).where(eq(tags.slug, slug));
-          if (tag) {
-            await db.insert(imageTags).values({ imageId: id, tagId: tag.id }).onConflictDoNothing();
-          }
-        }
-      }
+      if (input.tagNames) await attachTags(db, id, input.tagNames);
 
       if (input.postToBluesky) {
         const edited = input.postText?.trim();
@@ -126,16 +130,7 @@ export const server = {
 
       if (input.tagNames !== undefined) {
         await db.delete(imageTags).where(eq(imageTags.imageId, input.id));
-        const names = input.tagNames.split(',').map(s => s.trim()).filter(Boolean);
-        for (const name of names) {
-          const slug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
-          const tagId = nanoid();
-          await db.insert(tags).values({ id: tagId, name, slug }).onConflictDoNothing();
-          const [tag] = await db.select().from(tags).where(eq(tags.slug, slug));
-          if (tag) {
-            await db.insert(imageTags).values({ imageId: input.id, tagId: tag.id }).onConflictDoNothing();
-          }
-        }
+        await attachTags(db, input.id, input.tagNames);
       }
     },
   }),

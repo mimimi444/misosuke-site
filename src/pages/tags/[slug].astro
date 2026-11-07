@@ -1,4 +1,5 @@
 ---
+import { tagHref, tagSlug } from '../../lib/tags';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { getDb } from '../../db/client';
 import { images, imageTags, tags } from '../../db/schema';
@@ -14,7 +15,8 @@ let imageRows: (typeof images.$inferSelect & { tagList: string | null })[] = [];
 try {
   const db = getDb(env.DB);
 
-  const [tag] = await db.select().from(tags).where(eq(tags.slug, slug!));
+  // URL の表記ゆれ（全角英数字など）も同じタグとして扱う
+  const [tag] = await db.select().from(tags).where(eq(tags.slug, tagSlug(slug ?? '')));
   if (!tag) return Astro.redirect('/');
   tagName = tag.name;
 
@@ -75,7 +77,7 @@ function parseTagList(tagList: string | null): string[] {
                   {tagList.length > 0 && (
                     <div class="image-card-tags">
                       {tagList.map(t => (
-                        <a href={`/tags/${t.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '')}`} class="tag-pill">{t}</a>
+                        <a href={tagHref(t)} class="tag-pill">{t}</a>
                       ))}
                     </div>
                   )}
