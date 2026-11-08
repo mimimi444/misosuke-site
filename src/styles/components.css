@@ -212,3 +212,59 @@ a.chip:hover, a.tag-pill:hover { border-color: var(--accent); color: var(--accen
 @media (prefers-reduced-motion: reduce) {
   .animate-in { animation: none; }
 }
+
+/* ---------- ヘッダー・フッター ---------- */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  height: var(--header-h);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0 clamp(0.75rem, 2vw, 1.5rem);
+  background: var(--panel);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+
+.site-logo { display: flex; align-items: center; gap: 0.6rem; text-decoration: none; color: var(--ink); }
+.site-logo-mark {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  padding: 0.2rem 0.5rem;
+}
+.site-logo-name { font-weight: 700; font-size: 0.9rem; letter-spacing: 0.04em; }
+.site-header-badge { color: var(--accent); }
+
+.site-nav { display: flex; align-items: center; gap: 0.25rem; margin-left: auto; }
+.nav-link {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  color: var(--ink-muted);
+  text-decoration: none;
+  padding: 0.35rem 0.6rem;
+  border-bottom: 2px solid transparent;
+  transition: color 0.2s, border-color 0.2s;
+}
+.nav-link:hover { color: var(--ink); }
+.nav-link.active { color: var(--ink); border-bottom-color: var(--accent); }
+.nav-admin { color: var(--accent); font-family: var(--font-jp); letter-spacing: 0.04em; }
+
+.site-footer {
+  padding: 1.5rem clamp(0.75rem, 2vw, 1.5rem);
+  border-top: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  color: var(--ink-faint);
+}
+
+@media (max-width: 560px) {
+  .site-logo-name { display: none; }
+}

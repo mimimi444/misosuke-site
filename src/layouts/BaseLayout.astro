@@ -1,13 +1,13 @@
 ---
 import '../styles/global.css';
-import { adminHref, isLoggedIn } from '../lib/adminSession';
+import { isLoggedIn } from '../lib/adminSession';
+import SiteHeader from '../components/SiteHeader.astro';
 
 interface Props {
   title?: string;
   description?: string;
 }
 const { title = 'JJJ', description = '' } = Astro.props;
-const pathname = Astro.url.pathname;
 
 // ログイン中だけ、管理画面へのリンクを出す（キャッシュさせない設定は src/middleware.ts で付ける）
 const loggedIn = await isLoggedIn(Astro.cookies);
@@ -23,90 +23,28 @@ const loggedIn = await isLoggedIn(Astro.cookies);
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@100..900&family=Palette+Mosaic&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@100..900&display=swap" rel="stylesheet" />
   </head>
   <body>
     <div class="grain"></div>
 
-    <header class="site-header">
-      <a href="/" class="site-logo">
-        <span class="logo-main">JJJ</span>
-        <span class="logo-sub">ジャンク<br class="sp_only">ジャーナル<br class="sp_only">ジャーニー</span>
-      </a>
-      <nav class="site-nav">
-        <a href="/" class:list={['nav-link', { active: pathname === '/' }]}>フィード</a>
-        <a href="/albums" class:list={['nav-link', { active: pathname.startsWith('/albums') }]}>アルバム</a>
-        {loggedIn && <a href={adminHref('')} class="nav-link nav-admin" rel="nofollow">管理画面</a>}
-      </nav>
-    </header>
+    <SiteHeader variant="public" loggedIn={loggedIn} />
 
     <main>
       <slot />
     </main>
 
     <footer class="site-footer">
-      <span>ジャンクジャーナルジャーニー — 二次創作個人サイト</span>
+      <span>JUNK JOURNAL JOURNEY — 二次創作個人サイト</span>
     </footer>
   </body>
 </html>
 
 <style is:global>
   body { display: flex; flex-direction: column; }
-  main {
-    flex: 1;
-    margin: .5rem;
-    background: var(--surface);
-    border-radius: var(--radius-s);
-  }
+  main { flex: 1; }
 
-  /* 公開ナビ */
-  .site-nav {
-    display: flex;
-    align-items: center;
-    gap: .5rem;
-    margin-left: auto;
-  }
-
-  .nav-link {
-    position: relative;
-    font-size: clamp(var(--font-12), var(--font-14), var(--font-16));
-    font-weight: 600;
-
-    padding: 0.25rem 0.75rem;
-    border: 1px solid transparent;
-    border-radius: var(--radius-max);
-    transition: all .3s ease;
-
-  }
-  /* ログイン中だけ出る管理画面へのリンク */
-  .nav-admin {
-    color: var(--accent);
-    border-color: var(--accent);
-  }
-  .nav-link:hover{
-    background-color: var(--surface);
-    border-color: var(--green-vivid);
-
-  }
-  .nav-link.active { 
-    color: var(--bg);
-    border: 1px solid var(--green-vivid);
-    background-color: var(--green-vivid);
-  }
-  .nav-link.active:hover {
-    background-color: var(--green-shade);
-  }
-
-  /* フッター */
-  .site-footer {
-    padding: 2rem clamp(1.5rem, 5vw, 3rem);
-    border-top: 1px solid var(--border);
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    letter-spacing: 0.06em;
-  }
-
-  /* 画像グリッド */
+  /* 画像グリッド（フィード・タグページ。計画 2 で作り替える） */
   .image-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -116,11 +54,11 @@ const loggedIn = await isLoggedIn(Astro.cookies);
   .image-card {
     position: relative;
     overflow: hidden;
-    border-radius: 3px;
-    background: var(--surface);
+    border-radius: var(--r-md);
+    background: var(--panel-solid);
     aspect-ratio: 1;
     cursor: pointer;
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.13);
+    border: 1px solid var(--line);
   }
 
   .image-card img {
@@ -130,10 +68,7 @@ const loggedIn = await isLoggedIn(Astro.cookies);
     transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), filter 0.4s;
   }
 
-  .image-card:hover img {
-    transform: scale(1.04);
-    filter: brightness(0.72);
-  }
+  .image-card:hover img { transform: scale(1.04); filter: brightness(0.8); }
 
   /* カード全体を押せるようにする透明なボタン。タグのリンクはその上で押せる */
   .image-open {
@@ -159,18 +94,13 @@ const loggedIn = await isLoggedIn(Astro.cookies);
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
-    background: linear-gradient(to top, rgba(10, 24, 10, 0.82) 0%, transparent 60%);
+    background: var(--scrim);
     opacity: 0;
     transition: opacity 0.3s;
   }
   .image-card:hover .image-card-overlay { opacity: 1; }
 
-  .image-card-title {
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: #fff;
-    letter-spacing: 0.04em;
-  }
+  .image-card-title { font-size: 0.875rem; font-weight: 600; color: var(--overlay-ink); letter-spacing: 0.04em; }
 
   .image-card-tags {
     pointer-events: auto;
@@ -180,36 +110,18 @@ const loggedIn = await isLoggedIn(Astro.cookies);
     margin-top: 0.375rem;
   }
 
-  .tag-pill {
-    font-size: 0.7rem;
-    color: #fff;
-    background: rgba(255, 87, 20, 0.75);
-    padding: 0.15rem 0.5rem;
-    border-radius: 1px;
-    letter-spacing: 0.04em;
-    text-decoration: none;
-    transition: background 0.2s;
-  }
-  .tag-pill:hover { background: rgba(255, 87, 20, 0.95); }
-
   /* ページネーション */
-  .pagination {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 1rem;
-    padding: 2.5rem 0;
-  }
-
+  .pagination { display: flex; align-items: center; justify-content: center; gap: 0.75rem; padding: 2.5rem 0; }
   .pagination a, .pagination span {
-    font-size: 0.875rem;
-    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    color: var(--ink-muted);
     text-decoration: none;
-    padding: 0.4rem 0.8rem;
-    border: 1px solid var(--border);
-    border-radius: 2px;
-    transition: color 0.2s, border-color 0.2s;
+    padding: 0.35rem 0.75rem;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-sm);
   }
-  .pagination a:hover { color: var(--green-vivid); border-color: var(--green-vivid); }
-  .pagination .current { color: var(--green-vivid); border-color: var(--green-vivid); }
+  .pagination a:hover { color: var(--accent); border-color: var(--accent); }
+  .pagination .current { color: var(--accent); border-color: var(--accent); }
 </style>
