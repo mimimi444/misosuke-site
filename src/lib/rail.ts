@@ -2,10 +2,10 @@
 import { and, desc, eq, exists, lt, or, sql } from 'drizzle-orm';
 import type { getDb } from '../db/client';
 import { images, imageTags, tags } from '../db/schema';
-import { albumHref } from './albumSlug';
+import { railHref } from './links';
 import { loadImageAlbums } from './feedAlbums';
 import { thumbSrc } from './imageFiles';
-import { altText, displayTitle, formatPostedDate, workPath } from './workMeta';
+import { altText, displayTitle, formatPostedDate } from './workMeta';
 
 export type RailItem = {
   id: string;
@@ -20,10 +20,7 @@ export type RailItem = {
 
 export type Cursor = { createdAt: string; id: string };
 
-/** 作品を開く先。2 ページ以上のアルバムに入っていればそのページ、なければ作品ページ */
-export function railHref(imageId: string, album: { slug: string; page: number } | null): string {
-  return album ? `${albumHref(album.slug)}?page=${album.page}` : workPath(imageId);
-}
+export { railHref };
 
 export function encodeCursor(c: Cursor): string {
   return `${c.createdAt}|${c.id}`;

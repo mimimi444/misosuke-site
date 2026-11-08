@@ -10,6 +10,11 @@ const T_REST = 1.8;      // 戻し終わってから次の周回まで
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
+/** めくり終わって戻し始めるまでの時刻（これ以降は RIFFLE） */
+export function forwardEnd(leafCount: number): number {
+  return leafCount * T_GAP + T_HOLD_END;
+}
+
 export function cycleLength(leafCount: number): number {
   return leafCount * T_GAP + T_HOLD_END + leafCount * T_RIFFLE + T_REST;
 }

@@ -27,6 +27,17 @@
   --shadow-deep: 0 8px 40px rgba(0, 0, 0, 0.5);
   --shadow: 0 8px 24px rgba(40, 30, 20, 0.12);
   --shadow-strong: 0 14px 34px rgba(40, 30, 20, 0.22);
+  /* 3D の雑誌（three.js からも getComputedStyle で読む） */
+  --sheet: #fbf8f1;              /* 紙面の生成り */
+  --sheet-ink: #9a9188;          /* 紙面の小さな文字 */
+  --sheet-speck: rgba(120, 100, 70, 0.025); /* 紙のムラ */
+  --cover-inner: #efe7da;        /* 表紙の内側 */
+  --sheet-shadow: rgba(60, 45, 30, 0.22);   /* 雑誌の真下のぼんやりした影 */
+  --sheet-shadow-clear: rgba(60, 45, 30, 0);
+  --light-key: #fff6ea;
+  --light-rim: #ffd9c4;
+  --light-sky: #ffffff;
+  --light-ground: #e2dacb;
   --scrim: linear-gradient(to top, rgba(20, 18, 16, 0.72) 0%, rgba(20, 18, 16, 0) 60%);
 
   /* 文字 */

@@ -1,110 +1,36 @@
 ---
-import { tagHref, tagSlug } from '../../lib/tags';
+// タグページ: トップと同じ構成で、作品一覧と雑誌をそのタグの作品に絞る
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import HomeLayout from '../../components/HomeLayout.astro';
 import { getDb } from '../../db/client';
-import { images, imageTags, tags } from '../../db/schema';
-import { eq, desc, inArray, sql } from 'drizzle-orm';
-import { r2Url } from '../../lib/r2url';
+import { tags } from '../../db/schema';
+import { eq } from 'drizzle-orm';
 import { env } from 'cloudflare:workers';
+import { tagSlug } from '../../lib/tags';
+import { loadRailPage } from '../../lib/rail';
+import { loadShowcaseCandidates } from '../../lib/showcaseData';
+import { defaultShowcase } from '../../lib/showcase';
+import { RAIL_PAGE_SIZE } from '../api/rail';
 
-const { slug } = Astro.params;
+const db = getDb(env.DB);
+// URL の表記ゆれ（全角英数字など）も同じタグとして扱う
+const slug = tagSlug(Astro.params.slug ?? '');
+const [tag] = await db.select().from(tags).where(eq(tags.slug, slug));
+if (!tag) return Astro.redirect('/');
 
-let tagName = slug ?? '';
-let imageRows: (typeof images.$inferSelect & { tagList: string | null })[] = [];
-
-try {
-  const db = getDb(env.DB);
-
-  // URL の表記ゆれ（全角英数字など）も同じタグとして扱う
-  const [tag] = await db.select().from(tags).where(eq(tags.slug, tagSlug(slug ?? '')));
-  if (!tag) return Astro.redirect('/');
-  tagName = tag.name;
-
-  // 対象タグの画像IDを取得
-  const taggedImageIds = await db
-    .select({ imageId: imageTags.imageId })
-    .from(imageTags)
-    .where(eq(imageTags.tagId, tag.id));
-
-  if (taggedImageIds.length > 0) {
-    const ids = taggedImageIds.map(r => r.imageId);
-    const rows = await db
-      .select({
-        id: images.id,
-        title: images.title,
-        description: images.description,
-        r2Key: images.r2Key,
-        width: images.width,
-        height: images.height,
-        createdAt: images.createdAt,
-        tagList: sql<string>`group_concat(${tags.name}, ',')`,
-      })
-      .from(images)
-      .leftJoin(imageTags, eq(imageTags.imageId, images.id))
-      .leftJoin(tags, eq(tags.id, imageTags.tagId))
-      .where(inArray(images.id, ids))
-      .groupBy(images.id)
-      .orderBy(desc(images.createdAt));
-
-    imageRows = rows as typeof imageRows;
-  }
-} catch { }
-
-function parseTagList(tagList: string | null): string[] {
-  if (!tagList) return [];
-  return tagList.split(',').filter(Boolean);
-}
+const [rail, candidates] = await Promise.all([
+  loadRailPage(db, { tagSlug: slug, limit: RAIL_PAGE_SIZE }),
+  loadShowcaseCandidates(db, { tagSlug: slug }),
+]);
 ---
 
-<BaseLayout title={`#${tagName}`}>
-  <div class="tag-content">
-    <h1 class="page-title"><span><span class="tag-prefix">#</span>{tagName}</span> <span class="mono-number">{imageRows.length}</span> <span class="hud-label">TAG</span></h1>
-    {imageRows.length === 0 ? (
-      <div class="empty">
-        このタグの画像はありません。
-      </div>
-    ) : (
-      <>
-        <div class="image-grid">
-          {imageRows.map((img, i) => {
-            const tagList = parseTagList(img.tagList);
-            return (
-              <div class="image-card animate-in" style={`animation-delay:${i * 0.03}s`}>
-                <img src={r2Url(img.r2Key)} alt={img.title ?? ''} loading={i < 6 ? 'eager' : 'lazy'} />
-                <div class="image-card-overlay">
-                  {img.title && <span class="image-card-title">{img.title}</span>}
-                  {tagList.length > 0 && (
-                    <div class="image-card-tags">
-                      {tagList.map(t => (
-                        <a href={tagHref(t)} class="tag-pill">{t}</a>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-      </>
-    )}
-  </div>
+<BaseLayout title={`#${tag.name}`}>
+  <HomeLayout
+    items={rail.items}
+    nextCursor={rail.nextCursor}
+    candidates={candidates}
+    fallback={defaultShowcase(candidates)}
+    heading={`#${tag.name}`}
+    tag={tag.slug}
+  />
 </BaseLayout>
-
-<style>
-  .tag-content { padding: var(--gap) clamp(1.5rem, 5vw, 3rem) 3rem; }
-
-  .back-link {
-    display: inline-block;
-    margin-bottom: 0.75rem;
-    font-size: 0.8rem;
-    color: var(--ink-muted);
-    text-decoration: none;
-    transition: color 0.2s;
-  }
-  .back-link:hover { color: var(--accent); }
-
-  .tag-prefix { color: var(--accent); margin-right: 0.1em; }
-
-</style>
-

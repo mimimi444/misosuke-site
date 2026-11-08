@@ -1,156 +1,21 @@
 ---
-import { tagHref } from '../lib/tags';
+// トップ: 流れる作品一覧と、ランダムに選んだ作品がめくれる空中の雑誌
 import BaseLayout from '../layouts/BaseLayout.astro';
+import HomeLayout from '../components/HomeLayout.astro';
 import { getDb } from '../db/client';
-import { images, imageTags, tags } from '../db/schema';
-import { eq, desc, sql } from 'drizzle-orm';
-import { r2Url } from '../lib/r2url';
 import { env } from 'cloudflare:workers';
-import AlbumViewer from '../components/AlbumViewer.astro';
-import Lightbox from '../components/Lightbox.astro';
-import { loadImageAlbums } from '../lib/feedAlbums';
+import { loadRailPage } from '../lib/rail';
+import { loadShowcaseCandidates } from '../lib/showcaseData';
+import { defaultShowcase } from '../lib/showcase';
+import { RAIL_PAGE_SIZE } from './api/rail';
 
-const PAGE_SIZE = 24;
-const page = Number(Astro.url.searchParams.get('page') ?? '1');
-const offset = (page - 1) * PAGE_SIZE;
-
-type ImageRow = typeof images.$inferSelect & { tagList: string | null };
-
-let imageRows: ImageRow[] = [];
-let totalCount = 0;
-/** 画像 ID → ビューワーで開くアルバムの slug（2 ページ以上のアルバムに入っている画像だけ） */
-let imageAlbums = new Map<string, { slug: string; page: number }>();
-
-try {
-  const db = getDb(env.DB);
-
-  const rows = await db
-    .select({
-      id: images.id,
-      title: images.title,
-      description: images.description,
-      r2Key: images.r2Key,
-      width: images.width,
-      height: images.height,
-      createdAt: images.createdAt,
-      tagList: sql<string>`group_concat(${tags.name}, ',')`,
-    })
-    .from(images)
-    .leftJoin(imageTags, eq(imageTags.imageId, images.id))
-    .leftJoin(tags, eq(tags.id, imageTags.tagId))
-    .groupBy(images.id)
-    .orderBy(desc(images.createdAt))
-    .limit(PAGE_SIZE)
-    .offset(offset);
-
-  imageRows = rows as ImageRow[];
-
-  const [{ count }] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(images);
-  totalCount = count;
-
-  imageAlbums = await loadImageAlbums(db, imageRows.map(r => r.id));
-} catch {
-  // ローカルでD1バインディングがない場合は空表示
-}
-
-const totalPages = Math.ceil(totalCount / PAGE_SIZE);
-
-function parseTagList(tagList: string | null): string[] {
-  if (!tagList) return [];
-  return tagList.split(',').filter(Boolean);
-}
+const db = getDb(env.DB);
+const [rail, candidates] = await Promise.all([
+  loadRailPage(db, { limit: RAIL_PAGE_SIZE }),
+  loadShowcaseCandidates(db),
+]);
 ---
 
-<BaseLayout title="みそすけ">
-  <div class="feed-container">
-    {imageRows.length === 0 ? (
-      <div class="empty-state">
-        <p>まだ画像がありません。</p>
-      </div>
-    ) : (
-      <div class="image-grid">
-        {imageRows.map((img, i) => {
-          const tagList = parseTagList(img.tagList);
-          return (
-            <div class="image-card animate-in" style={`animation-delay:${i * 0.03}s`}>
-              <button
-                type="button"
-                class="image-open"
-                data-image-id={img.id}
-                data-src={r2Url(img.r2Key)}
-                data-title={img.title ?? ''}
-                data-album={imageAlbums.get(img.id)?.slug}
-                aria-label={`${img.title || '画像'}を${imageAlbums.has(img.id) ? 'アルバムで' : '拡大して'}表示`}
-              ></button>
-              <img
-                src={r2Url(img.r2Key)}
-                alt={img.title ?? ''}
-                loading={i < 6 ? 'eager' : 'lazy'}
-              />
-              <div class="image-card-overlay">
-                {img.title && <span class="image-card-title">{img.title}</span>}
-                {tagList.length > 0 && (
-                  <div class="image-card-tags">
-                    {tagList.map(t => (
-                      <a href={tagHref(t)} class="tag-pill">{t}</a>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    )}
-
-    {totalPages > 1 && (
-      <nav class="pagination">
-        {page > 1 && <a href={`/?page=${page - 1}`}>← 前</a>}
-        <span class="current">{page} / {totalPages}</span>
-        {page < totalPages && <a href={`/?page=${page + 1}`}>次 →</a>}
-      </nav>
-    )}
-  </div>
-
-  <AlbumViewer />
-  <Lightbox />
+<BaseLayout title="JJJ">
+  <HomeLayout items={rail.items} nextCursor={rail.nextCursor} candidates={candidates} fallback={defaultShowcase(candidates)} />
 </BaseLayout>
-
-<script>
-  import { openAlbumViewer } from '../lib/albumViewer';
-  import { openLightbox } from '../lib/lightbox';
-
-  // 2 ページ以上のアルバムに入っている画像はそのページからビューワーで、それ以外はライトボックスで開く
-  document.querySelectorAll<HTMLButtonElement>('.image-open').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const { album, imageId, src, title } = btn.dataset;
-      if (album && (await openAlbumViewer(album, imageId))) return;
-      openLightbox(src!, title ?? '');
-    });
-  });
-</script>
-
-<style>
-  .feed-container {
-    padding: var(--gap) clamp(1.5rem, 5vw, 3rem) 3rem;
-  }
-
-  .empty-state {
-    padding: 4rem 0;
-    text-align: center;
-    color: var(--ink-muted);
-    font-size: 1rem;
-  }
-
-
-
-
-
-
-
-
-
-</style>
-

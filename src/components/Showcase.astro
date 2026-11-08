@@ -1,0 +1,84 @@
+---
+// トップとタグページの「見せる」ページめくり。
+// JavaScript 前は固定内容（fallback）の最初の見開きを平面で出し、three.js の準備ができたらキャンバスに切り替える。
+import type { Showcase, ShowcaseCandidates } from '../lib/showcase';
+import { railHref } from '../lib/links';
+import { workPath } from '../lib/workMeta';
+
+interface Props {
+  candidates: ShowcaseCandidates;
+  fallback: Showcase | null;
+}
+const { candidates, fallback } = Astro.props;
+const spread = fallback ? [fallback.pages[0], fallback.pages[1]].filter(Boolean) : [];
+// JavaScript 前・WebGL なしのときのリンク先（最初の見開きの 1 ページ目）
+const first = fallback?.pages[0];
+const fallbackHref = !fallback || !first ? '#' : fallback.kind === 'album' ? railHref(first.id, { slug: fallback.slug, page: 1 }) : workPath(first.id);
+---
+
+<section class="showcase" aria-label="作品の雑誌">
+  {fallback ? (
+    <>
+      <div class="showcase-flat" aria-hidden="false">
+        {spread.map((p) => p && <img src={p.src} alt={p.title} />)}
+      </div>
+      <canvas class="showcase-canvas" hidden aria-label={`${fallback.title} のページがめくれる様子`}></canvas>
+      <a class="showcase-hit" href={fallbackHref} aria-label={`${fallback.title} を見る`}></a>
+
+      <div class="showcase-hud showcase-now panel">
+        <p class="hud-label">NOW OPEN</p>
+        <p class="showcase-title" data-role="title">{fallback.title}</p>
+        <p class="hud-label" data-role="count">{fallback.pages.length} PAGES</p>
+      </div>
+      <p class="showcase-hud showcase-turn hud-label" data-role="turn">AUTO TURN ・ 01 / {String(Math.ceil(fallback.pages.length / 2)).padStart(2, '0')}</p>
+      <p class="showcase-hud showcase-state state-label" data-role="state">HOLDING</p>
+
+      <script type="application/json" data-role="candidates" set:html={JSON.stringify(candidates).replace(/</g, '\\u003c')}></script>
+    </>
+  ) : (
+    <div class="empty showcase-empty">まだ作品がありません。</div>
+  )}
+</section>
+
+<style is:global>
+  .showcase { position: relative; min-height: 0; min-width: 0; overflow: hidden; }
+  .showcase-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .showcase-canvas[hidden] { display: none; }
+
+  /* JavaScript 前・WebGL なしの平面表示: 見開きを少し傾けて置く */
+  .showcase-flat {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 8% 10%;
+  }
+  .showcase-flat img {
+    max-width: 42%;
+    max-height: 80%;
+    object-fit: contain;
+    background: var(--sheet);
+    padding: 1.2rem;
+    box-shadow: var(--shadow-strong);
+  }
+  .showcase[data-mode="3d"] .showcase-flat { display: none; }
+
+  .showcase-hit { position: absolute; inset: 0; z-index: 1; }
+  .showcase-hit:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+
+  /* 計器風パネル（トップでは絵に重なってよい） */
+  .showcase-hud { position: absolute; z-index: 2; pointer-events: none; margin: 0; }
+  .showcase-now { top: 1rem; right: 1rem; min-width: 180px; max-width: 46%; }
+  .showcase-title { font-weight: 700; overflow-wrap: anywhere; }
+  .showcase-turn { left: 1rem; bottom: 1rem; }
+  .showcase-state { right: 1.25rem; bottom: 0.75rem; }
+
+  .showcase-empty { margin: 2rem; }
+</style>
+
+<script>
+  import { initShowcases } from '../lib/showcaseClient';
+  initShowcases();
+</script>
