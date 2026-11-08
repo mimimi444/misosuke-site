@@ -77,11 +77,11 @@ if (Astro.request.method === 'POST' && album) {
 <AdminLayout title="アルバムを編集">
   <div class="edit-header">
     <a href={adminHref('/albums')} class="back-link">← アルバム一覧</a>
-    <h2 class="admin-section-title">アルバムを編集</h2>
+    <h2 class="page-title">アルバムを編集</h2>
   </div>
 
   {!album ? (
-    <p style="color:var(--text-muted)">アルバムが見つかりません。</p>
+    <p class="empty">アルバムが見つかりません。</p>
   ) : (
     <form method="POST" class="edit-album-form">
       <div class="form-row">
@@ -98,7 +98,7 @@ if (Astro.request.method === 'POST' && album) {
       <input type="hidden" name="imageIds" id="imageIdsInput" value={albumImageIds.join(',')} />
       <input type="hidden" name="coverImageId" id="coverImageIdInput" value={album.coverImageId ?? ''} />
 
-      <div class="image-picker-section">
+      <div class="card image-picker-section">
         <div class="picker-header">
           <h3 class="picker-title">画像を選択</h3>
           <span class="selected-count" id="selectedCount">{albumImageIds.length} 枚選択中</span>
@@ -144,13 +144,13 @@ if (Astro.request.method === 'POST' && album) {
     display: inline-block;
     margin-bottom: 0.75rem;
     font-size: 0.8rem;
-    color: var(--text-muted);
+    color: var(--ink-muted);
     text-decoration: none;
     transition: color 0.2s;
   }
   .back-link:hover { color: var(--accent); }
 
-  .admin-section-title { border-bottom: none; margin-bottom: 0.5rem; }
+  .page-title { margin-bottom: 0.5rem; }
   .required { color: var(--accent); }
   .edit-album-form { max-width: 900px; }
 
@@ -162,8 +162,8 @@ if (Astro.request.method === 'POST' && album) {
   }
 
   .image-picker-section {
-    border: 1px solid var(--border);
-    border-radius: 2px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-sm);
     overflow: hidden;
     margin-bottom: 1.5rem;
   }
@@ -173,11 +173,11 @@ if (Astro.request.method === 'POST' && album) {
     align-items: center;
     justify-content: space-between;
     padding: 0.875rem 1rem;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
+    background: var(--panel-solid);
+    border-bottom: 1px solid var(--line-strong);
   }
 
-  .picker-title { font-size: 0.875rem; font-weight: 500; color: var(--text); letter-spacing: 0.04em; }
+  .picker-title { font-size: 0.875rem; font-weight: 500; color: var(--ink); letter-spacing: 0.04em; }
   .selected-count { font-size: 0.8rem; color: var(--accent); letter-spacing: 0.04em; }
 
   .image-picker-grid {
@@ -187,13 +187,13 @@ if (Astro.request.method === 'POST' && album) {
     padding: 1rem;
     max-height: 420px;
     overflow-y: auto;
-    background: var(--bg);
+    background: var(--paper);
   }
 
   .picker-card {
     position: relative;
     cursor: pointer;
-    border-radius: 2px;
+    border-radius: var(--r-sm);
     overflow: hidden;
     border: 2px solid transparent;
     transition: border-color 0.15s;
@@ -211,7 +211,7 @@ if (Astro.request.method === 'POST' && album) {
     width: 20px;
     height: 20px;
     background: var(--accent);
-    color: var(--bg);
+    color: var(--paper);
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -227,8 +227,8 @@ if (Astro.request.method === 'POST' && album) {
     display: block;
     padding: 0.25rem 0.375rem;
     font-size: 0.65rem;
-    color: var(--text-muted);
-    background: var(--surface);
+    color: var(--ink-muted);
+    background: var(--panel-solid);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -236,10 +236,10 @@ if (Astro.request.method === 'POST' && album) {
 
   .form-error {
     font-size: 0.85rem;
-    color: #c97070;
-    background: rgba(201, 112, 112, 0.1);
-    border: 1px solid rgba(201, 112, 112, 0.3);
-    border-radius: 2px;
+    color: var(--danger);
+    background: var(--danger-soft);
+    border: 1px solid var(--danger);
+    border-radius: var(--r-sm);
     padding: 0.625rem 0.875rem;
     margin-bottom: 1rem;
   }
