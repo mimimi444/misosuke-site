@@ -1,0 +1,38 @@
+/* =====================================================
+   見た目のトークン。色・文字・角丸はここだけで決める。
+   ほかのファイルでは色を直書きせず、必ずこの変数を使う（consistency.test.ts で検査）
+   ===================================================== */
+:root {
+  /* 色 */
+  --paper: #f1eee8;              /* 背景（生成りに近いオフホワイト） */
+  --panel: rgba(255, 255, 255, 0.72);
+  --panel-solid: #fbfaf7;
+  --line: rgba(0, 0, 0, 0.08);
+  --line-strong: rgba(0, 0, 0, 0.16);
+  --ink: #2b2b2b;                /* 文字 */
+  --ink-muted: #6b6760;
+  --ink-faint: #9a958d;
+  --accent: #ff5714;             /* アクセント（オレンジ） */
+  --accent-dim: #d9450c;
+  --accent-ink: #ffffff;         /* アクセントの上の文字 */
+  --accent-soft: rgba(255, 87, 20, 0.12);
+  --danger: #c0392b;
+  --danger-soft: rgba(192, 57, 43, 0.1);
+  --overlay: rgba(20, 18, 16, 0.82);   /* ライトボックスなどの背景 */
+  --overlay-ink: #ffffff;
+  --shadow: 0 8px 24px rgba(40, 30, 20, 0.12);
+  --shadow-strong: 0 14px 34px rgba(40, 30, 20, 0.22);
+  --scrim: linear-gradient(to top, rgba(20, 18, 16, 0.72) 0%, rgba(20, 18, 16, 0) 60%);
+
+  /* 文字 */
+  --font-jp: 'Noto Sans JP', sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-display: 'Palette Mosaic', sans-serif;
+
+  /* 寸法 */
+  --r-sm: 4px;
+  --r-md: 8px;
+  --r-pill: 999px;
+  --gap: clamp(1rem, 2vw, 1.5rem);
+  --header-h: 56px;
+}
