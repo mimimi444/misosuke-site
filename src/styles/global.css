@@ -2,26 +2,6 @@
 @import './components.css';
 
 /* =====================
-   移行用の別名（古い変数名を使っているページが残っている間だけ。計画 1 の Task 4 で消す）
-   ===================== */
-:root {
-  --bg: var(--paper);
-  --surface: var(--panel-solid);
-  --surface-2: var(--panel);
-  --border: var(--line-strong);
-  --text: var(--ink);
-  --text-muted: var(--ink-muted);
-  --green-vivid: var(--accent);
-  --green-shade: var(--accent-dim);
-  --radius-s: var(--r-sm);
-  --radius-max: var(--r-pill);
-  --font-serif: var(--font-jp);
-  --font-12: 12px;
-  --font-14: 14px;
-  --font-16: 16px;
-}
-
-/* =====================
    Reset
    ===================== */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }

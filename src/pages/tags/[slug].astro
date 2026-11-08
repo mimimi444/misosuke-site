@@ -57,11 +57,10 @@ function parseTagList(tagList: string | null): string[] {
 ---
 
 <BaseLayout title={`#${tagName}`}>
-
-
   <div class="tag-content">
+    <h1 class="page-title"><span><span class="tag-prefix">#</span>{tagName}</span> <span class="mono-number">{imageRows.length}</span> <span class="hud-label">TAG</span></h1>
     {imageRows.length === 0 ? (
-      <div style="padding:4rem 0; text-align:center; color:var(--text-muted)">
+      <div class="empty">
         このタグの画像はありません。
       </div>
     ) : (
@@ -99,7 +98,7 @@ function parseTagList(tagList: string | null): string[] {
     display: inline-block;
     margin-bottom: 0.75rem;
     font-size: 0.8rem;
-    color: var(--text-muted);
+    color: var(--ink-muted);
     text-decoration: none;
     transition: color 0.2s;
   }

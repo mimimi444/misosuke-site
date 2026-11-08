@@ -16,7 +16,7 @@
     position: fixed;
     inset: 0;
     z-index: 1000;
-    background: rgba(0, 0, 0, 0.82);
+    background: var(--overlay);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -46,13 +46,13 @@
     max-height: calc(100vh - 6rem);
     max-height: calc(100dvh - 6rem);
     object-fit: contain;
-    border-radius: 2px;
-    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+    border-radius: var(--r-sm);
+    box-shadow: var(--shadow-deep);
     cursor: default;
   }
 
   .lightbox-caption {
-    color: #fff;
+    color: var(--overlay-ink);
     font-size: 0.875rem;
     letter-spacing: 0.04em;
     text-align: center;
@@ -67,13 +67,13 @@
     height: 2.5rem;
     border: none;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.15);
-    color: #fff;
+    background: var(--overlay-control);
+    color: var(--overlay-ink);
     font-size: 1.1rem;
     cursor: pointer;
   }
   .lightbox-close:hover,
-  .lightbox-close:focus-visible { background: rgba(255, 255, 255, 0.3); }
+  .lightbox-close:focus-visible { background: var(--overlay-control-hover); }
 </style>
 
 <script>

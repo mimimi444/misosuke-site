@@ -16,7 +16,7 @@
   .viewer-overlay {
     position: fixed;
     inset: 0;
-    background: #000;
+    background: var(--viewer-bg);
     z-index: 1000;
     display: flex;
     flex-direction: column;
@@ -40,7 +40,7 @@
   .viewer-thumbs {
     width: 88px;
     overflow-y: auto;
-    background: #0a0a0a;
+    background: var(--viewer-rail);
     padding: 0.5rem;
     display: flex;
     flex-direction: column;
@@ -54,7 +54,7 @@
     padding: 0;
     background: none;
     border: 2px solid transparent;
-    border-radius: 2px;
+    border-radius: var(--r-sm);
     cursor: pointer;
     transition: border-color 0.15s;
   }
@@ -66,7 +66,7 @@
     aspect-ratio: 3/4;
     object-fit: cover;
     display: block;
-    border-radius: 1px;
+    border-radius: var(--r-sm);
   }
 
   .viewer-container {

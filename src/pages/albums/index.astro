@@ -43,20 +43,21 @@ try {
 
 <BaseLayout title="アルバム">
   <div class="albums-container">
+    <h1 class="page-title">アルバム <span class="mono-number">{albumRows.length}</span> <span class="hud-label">ALBUMS</span></h1>
     {albumRows.length === 0 ? (
-      <div class="empty-state">
+      <div class="empty">
         <p>アルバムがありません。</p>
       </div>
     ) : (
       <div class="albums-grid">
         {albumRows.map((album, i) => (
-          <div class="album-card animate-in" style={`animation-delay:${i * 0.05}s`}>
+          <div class="card album-card animate-in" style={`animation-delay:${i * 0.05}s`}>
             <div class="album-cover">
               {album.coverKey
                 ? <img src={r2Url(album.coverKey)} alt={album.title} loading="lazy" />
                 : <div class="album-cover-placeholder">No Image</div>
               }
-              <div class="album-count">{album.imageCount} 枚</div>
+              <div class="hud-label album-count">{album.imageCount} PAGES</div>
             </div>
             <div class="album-info">
               <h2 class="album-title">{album.title}</h2>
@@ -82,12 +83,6 @@ try {
     padding: var(--gap) clamp(1.5rem, 5vw, 3rem) 3rem;
   }
 
-  .empty-state {
-    padding: 4rem 0;
-    text-align: center;
-    color: var(--text-muted);
-  }
-
   .albums-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -97,15 +92,15 @@ try {
   .album-card {
     display: flex;
     flex-direction: column;
-    gap: 0.875rem;
+    gap: 0.75rem;
+    padding-bottom: 1rem;
   }
 
   .album-cover {
     position: relative;
     aspect-ratio: 4/3;
     overflow: hidden;
-    border-radius: 2px;
-    background: var(--surface);
+    background: var(--line);
   }
 
   .album-cover img {
@@ -121,23 +116,21 @@ try {
     align-items: center;
     justify-content: center;
     font-size: 0.75rem;
-    color: var(--text-muted);
+    color: var(--ink-muted);
   }
 
   .album-count {
     position: absolute;
     bottom: 0.625rem;
     right: 0.625rem;
-    background: rgba(12, 11, 10, 0.75);
-    color: var(--text-muted);
-    font-size: 0.7rem;
+    background: var(--overlay);
+    color: var(--overlay-ink);
     padding: 0.2rem 0.5rem;
-    border-radius: 2px;
-    letter-spacing: 0.04em;
+    border-radius: var(--r-sm);
   }
 
   .album-info {
-    padding: 0 0.25rem;
+    padding: 0 1rem;
     display: flex;
     flex-direction: column;
     gap: 0.4rem;
@@ -146,14 +139,13 @@ try {
   .album-title {
     font-family: var(--font-jp);
     font-size: 1rem;
-    font-weight: 500;
-    color: var(--text);
-    letter-spacing: 0.04em;
+    font-weight: 700;
+    color: var(--ink);
   }
 
   .album-desc {
     font-size: 0.8rem;
-    color: var(--text-muted);
+    color: var(--ink-muted);
     line-height: 1.5;
     display: -webkit-box;
     -webkit-line-clamp: 2;

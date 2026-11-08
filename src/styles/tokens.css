@@ -20,6 +20,11 @@
   --danger-soft: rgba(192, 57, 43, 0.1);
   --overlay: rgba(20, 18, 16, 0.82);   /* ライトボックスなどの背景 */
   --overlay-ink: #ffffff;
+  --overlay-control: rgba(255, 255, 255, 0.15);
+  --overlay-control-hover: rgba(255, 255, 255, 0.3);
+  --viewer-bg: #000000;          /* 作品を読むビューワーの背景 */
+  --viewer-rail: #0a0a0a;
+  --shadow-deep: 0 8px 40px rgba(0, 0, 0, 0.5);
   --shadow: 0 8px 24px rgba(40, 30, 20, 0.12);
   --shadow-strong: 0 14px 34px rgba(40, 30, 20, 0.22);
   --scrim: linear-gradient(to top, rgba(20, 18, 16, 0.72) 0%, rgba(20, 18, 16, 0) 60%);
