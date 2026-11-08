@@ -103,6 +103,13 @@ describe('resolvePostText', () => {
   test('仮の URL が含まれていなければ、そのまま（勝手に URL を足さない）', () => {
     expect(resolvePostText('リンクなし', SITE, 'abc')).toBe('リンクなし');
   });
+  test('手で編集して仮の ID の x が減っていても、実際の作品 URL に置き換える（壊れたリンクを投稿しない）', () => {
+    expect(resolvePostText(`T\n${SITE}works/xxxxxxxx`, SITE, 'abc')).toBe(`T\n${SITE}works/abc`);
+    expect(resolvePostText(`${SITE}works/x 続き`, SITE, 'abc')).toBe(`${SITE}works/abc 続き`);
+  });
+  test('x で始まる本物の ID らしい文字列までは置き換えない', () => {
+    expect(resolvePostText(`${SITE}works/xyz123`, SITE, 'abc')).toBe(`${SITE}works/xyz123`);
+  });
   test('仮の ID は nanoid と同じ 21 文字（文字数の表示がずれない）', () => {
     expect(WORK_ID_PLACEHOLDER).toHaveLength(21);
   });

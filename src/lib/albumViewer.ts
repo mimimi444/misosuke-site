@@ -66,7 +66,7 @@ export async function openAlbumViewer(slug: string, startImageId?: string): Prom
       readingDirection: 'rtl',
       pageTurnMode: 'single',
       layoutMode: 'inline',
-      backgroundColor: 'black',
+      backgroundColor: 'black', // comimi の背景テーマ名（CSS の色ではない） consistency-allow
     },
     // 前回の続きのページを覚える機能は、特定のページから開くときは使わない
     storage: { enabled: found < 0 },

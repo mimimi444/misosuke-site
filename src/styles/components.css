@@ -139,7 +139,9 @@ input[type="checkbox"] { accent-color: var(--accent); }
   color: var(--ink);
   background: var(--panel-solid);
   text-decoration: none;
-  white-space: nowrap;
+  /* 長いタグ名でも親の幅からはみ出さず、チップの中で折り返す */
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 a.chip:hover, a.tag-pill:hover { border-color: var(--accent); color: var(--accent); }
 .chip-accent { border-color: var(--accent); color: var(--accent); }

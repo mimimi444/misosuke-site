@@ -258,7 +258,7 @@ export default function UploadForm({ tagSuggestions, siteUrl }: Props) {
                           disabled={!item.postToBluesky || item.postTextEdited}
                           onChange={e => updateSetting(i, 'includeLink', e.target.checked)}
                         />
-                        サイトへのリンクを含める
+                        作品ページへのリンクを含める
                       </label>
                     </div>
                     <div className="form-group">

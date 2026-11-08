@@ -1,3 +1,5 @@
+import { workPath } from '../workMeta';
+
 /** Bluesky の本文上限（grapheme 単位） */
 export const POST_MAX_GRAPHEMES = 300;
 
@@ -72,11 +74,15 @@ export const WORK_ID_PLACEHOLDER = 'x'.repeat(21);
 
 /** 仮の作品 URL を含む文面にするための URL（アップロード画面の自動作成で使う） */
 export function placeholderWorkUrl(siteUrl: string): string {
-  return new URL(`works/${WORK_ID_PLACEHOLDER}`, siteUrl).href;
+  return new URL(workPath(WORK_ID_PLACEHOLDER), siteUrl).href;
 }
 
-/** 文面中の仮の作品 URL を、実際の作品 URL に置き換える。含まれていなければそのまま */
+/**
+ * 文面中の仮の作品 URL を、実際の作品 URL に置き換える。含まれていなければそのまま。
+ * 手で編集して x の数が減っていても置き換える（壊れたリンクを投稿しないため）。
+ */
 export function resolvePostText(text: string, siteUrl: string, workId: string): string {
-  const real = new URL(`works/${encodeURIComponent(workId)}`, siteUrl).href;
-  return text.split(placeholderWorkUrl(siteUrl)).join(real);
+  const real = new URL(workPath(workId), siteUrl).href;
+  const prefix = new URL('/works/', siteUrl).href.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return text.replace(new RegExp(`${prefix}x+(?![A-Za-z0-9_-])`, 'g'), real);
 }
