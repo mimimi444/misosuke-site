@@ -1,0 +1,105 @@
+---
+// 流れる作品一覧（レール）。PC は縦の列、スマホは横の帯。動きは src/lib/railClient.ts。
+import type { RailItem } from '../lib/rail';
+
+interface Props {
+  items: RailItem[];
+  nextCursor: string | null;
+  /** タグページでは、そのタグで絞り込んで読み足す */
+  tag?: string;
+}
+const { items, nextCursor, tag } = Astro.props;
+---
+
+<nav class="rail" aria-label="作品一覧" data-next-cursor={nextCursor ?? ''} data-tag={tag ?? ''}>
+  <div class="rail-viewport">
+    <ul class="rail-track">
+      {items.map((item) => (
+        <li class="rail-cell">
+          <a
+            class="rail-item"
+            href={item.href}
+            data-title={item.title}
+            data-date={item.date}
+            data-tags={JSON.stringify(item.tags)}
+            data-album={item.albumTitle ?? ''}
+          >
+            <img src={item.thumb} alt={item.alt} loading="lazy" decoding="async" width="400" height="400" />
+          </a>
+        </li>
+      ))}
+    </ul>
+  </div>
+
+  <div class="rail-pop panel" hidden aria-live="polite">
+    <p class="rail-pop-title"></p>
+    <p class="hud-label rail-pop-date"></p>
+    <p class="rail-pop-tags row"></p>
+    <p class="rail-pop-album"></p>
+    <a class="btn btn-primary btn-sm rail-pop-open" href="#">開く</a>
+  </div>
+</nav>
+
+<style is:global>
+  /* グリッドの枠に収める（min-height/min-width: 0 が無いと中身の長さまで伸びてしまい、流れが始まらない） */
+  .rail { position: relative; overflow: visible; min-height: 0; min-width: 0; height: 100%; }
+  .rail-viewport { overflow: hidden; height: 100%; width: 100%; }
+  .rail-track { list-style: none; margin: 0; padding: 0; display: flex; gap: 10px; will-change: transform; }
+  .rail-item {
+    display: block;
+    border-radius: var(--r-sm);
+    overflow: hidden;
+    border: 1px solid var(--line);
+    background: var(--panel-solid);
+    transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.35s;
+    transform-origin: center;
+  }
+  .rail-item img { width: 100%; height: 100%; aspect-ratio: 1; object-fit: cover; }
+  .rail-item.is-active { transform: scale(1.35); box-shadow: var(--shadow-strong); position: relative; z-index: 2; }
+  .rail-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* PC: 左の縦の列 */
+  .rail[data-orientation="vertical"] .rail-track { flex-direction: column; padding: 12px 14px; }
+  .rail[data-orientation="vertical"] .rail-cell { width: 64px; }
+
+  /* スマホ: 上の横の帯 */
+  .rail[data-orientation="horizontal"] .rail-track { flex-direction: row; padding: 10px 12px; }
+  .rail[data-orientation="horizontal"] .rail-cell { width: 52px; flex: none; }
+
+  /* 動きを減らす設定では自動で流さず、手でスクロールできるようにする */
+  .rail[data-static] .rail-viewport { overflow: auto; }
+
+  .rail-pop {
+    position: absolute;
+    z-index: 20;
+    width: 220px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    box-shadow: var(--shadow);
+    animation: rail-pop-float 3.2s ease-in-out infinite;
+    pointer-events: auto;
+  }
+  .rail-pop[hidden] { display: none; }
+  .rail-pop-title { font-weight: 700; font-size: 0.95rem; overflow-wrap: anywhere; }
+  .rail-pop-tags { gap: 0.3rem; }
+  .rail-pop-album { font-size: 0.8rem; color: var(--ink-muted); }
+  .rail-pop-album:empty, .rail-pop-tags:empty { display: none; }
+  .rail-pop-open { align-self: flex-start; }
+  /* マウス操作ではサムネイル自体を押せばよいので「開く」は出さない */
+  .rail[data-pointer="mouse"] .rail-pop-open { display: none; }
+
+  @keyframes rail-pop-float {
+    0%, 100% { transform: translateY(-3px); }
+    50% { transform: translateY(4px); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .rail-pop { animation: none; }
+    .rail-item { transition: none; }
+  }
+</style>
+
+<script>
+  import { initRails } from '../lib/railClient';
+  initRails();
+</script>
