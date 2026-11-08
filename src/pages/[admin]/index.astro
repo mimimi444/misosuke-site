@@ -3,13 +3,14 @@ import { adminHref } from '../../lib/adminSession';
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import { getDb } from '../../db/client';
 import { images, albums, tags } from '../../db/schema';
-import { desc, sql } from 'drizzle-orm';
+import { desc, isNull, sql } from 'drizzle-orm';
 import { r2Url } from '../../lib/r2url';
 import { env } from 'cloudflare:workers';
 
 let imageCount = 0;
 let albumCount = 0;
 let tagCount = 0;
+let missingThumbs = 0;
 let recentImages: (typeof images.$inferSelect)[] = [];
 
 try {
@@ -20,6 +21,8 @@ try {
   imageCount = ic.count;
   albumCount = ac.count;
   tagCount = tc.count;
+  const [mt] = await db.select({ count: sql<number>`count(*)` }).from(images).where(isNull(images.thumbR2Key));
+  missingThumbs = mt.count;
   recentImages = await db.select().from(images).orderBy(desc(images.createdAt)).limit(6);
 } catch { }
 ---
@@ -50,6 +53,17 @@ try {
     <a href={adminHref('/albums/new')} class="btn">＋ アルバムを作成</a>
   </div>
 
+  {missingThumbs > 0 && (
+    <section class="panel thumbs-panel" data-endpoint={adminHref('/maintenance/thumbnails')}>
+      <p class="hud-label">MAINTENANCE</p>
+      <p>作品一覧用のサムネイルがまだ無い画像が <strong class="mono-number" id="thumbsRemaining">{missingThumbs}</strong> 件あります。</p>
+      <div class="row">
+        <button type="button" class="btn btn-primary btn-sm" id="thumbsRun">サムネイルを作成</button>
+        <span class="hud-label" id="thumbsStatus" aria-live="polite"></span>
+      </div>
+    </section>
+  )}
+
   {recentImages.length > 0 && (
     <section>
       <h3 class="hud-label recent-title">RECENT / 最近の投稿</h3>
@@ -78,6 +92,7 @@ try {
   .stat-label { font-size: 0.75rem; color: var(--ink-muted); }
 
   .quick-actions { margin-bottom: 2.5rem; }
+  .thumbs-panel { display: flex; flex-direction: column; gap: 0.5rem; max-width: 540px; margin-bottom: 2rem; }
 
   .recent-title { margin-bottom: 0.75rem; }
   .recent-grid {
@@ -96,3 +111,28 @@ try {
     text-overflow: ellipsis;
   }
 </style>
+
+<script>
+  // サムネイルが無い画像がなくなるまで、少しずつ作成を呼び出す
+  const panel = document.querySelector<HTMLElement>('.thumbs-panel');
+  const run = document.getElementById('thumbsRun') as HTMLButtonElement | null;
+  const remainingEl = document.getElementById('thumbsRemaining');
+  const statusEl = document.getElementById('thumbsStatus');
+  run?.addEventListener('click', async () => {
+    run.disabled = true;
+    try {
+      for (;;) {
+        statusEl!.textContent = 'RUNNING…';
+        const res = await fetch(panel!.dataset.endpoint!, { method: 'POST' });
+        if (!res.ok) throw new Error(String(res.status));
+        const { remaining } = (await res.json()) as { processed: number; remaining: number };
+        remainingEl!.textContent = String(remaining);
+        if (remaining === 0) break;
+      }
+      statusEl!.textContent = 'DONE';
+    } catch (e) {
+      statusEl!.textContent = `ERROR ${e instanceof Error ? e.message : ''}`;
+      run.disabled = false;
+    }
+  });
+</script>

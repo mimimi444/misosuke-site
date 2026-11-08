@@ -29,6 +29,13 @@
       "when": 1794061732025,
       "tag": "0003_omniscient_silverclaw",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1794150569121,
+      "tag": "0004_mighty_gideon",
+      "breakpoints": true
     }
   ]
 }

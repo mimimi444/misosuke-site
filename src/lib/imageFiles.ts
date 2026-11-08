@@ -1,18 +1,23 @@
 // アップロード画像の保存先と配布に関する決まりごと（純粋関数）
+import { r2Url } from './r2url';
 
 /** 公開用に圧縮するときの設定 */
 export const COMPRESS = { maxEdge: 2000, format: 'image/webp', quality: 80 } as const;
 
+/** 作品一覧のサムネイル */
+export const THUMB = { maxEdge: 400, format: 'image/webp', quality: 75 } as const;
+
 const ORIGINALS_PREFIX = 'originals/';
 
 /** R2 のキー。元画像は originals/ に置き、公開 URL からは取得させない */
-export function imageKeys(id: string, fileName: string, now: Date): { originalKey: string; displayKey: string } {
+export function imageKeys(id: string, fileName: string, now: Date): { originalKey: string; displayKey: string; thumbKey: string } {
   const ym = `${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
   const rawExt = fileName.includes('.') ? fileName.split('.').pop()! : '';
   const ext = rawExt.toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin';
   return {
     originalKey: `${ORIGINALS_PREFIX}${ym}/${id}.${ext}`,
     displayKey: `images/${ym}/${id}.webp`,
+    thumbKey: `thumbs/${ym}/${id}.webp`,
   };
 }
 
@@ -41,4 +46,9 @@ export function contentDisposition(title: string | null | undefined, id: string,
   const base = (title?.trim() || id).replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_');
   const encoded = encodeURIComponent(`${base}.${ext}`).replace(/['()*]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
   return `attachment; filename="${id}.${ext}"; filename*=UTF-8''${encoded}`;
+}
+
+/** 作品一覧に使う画像。サムネイルがまだ無い古い画像は公開用画像で代用する */
+export function thumbSrc(row: { thumbR2Key: string | null; r2Key: string }): string {
+  return r2Url(row.thumbR2Key ?? row.r2Key);
 }

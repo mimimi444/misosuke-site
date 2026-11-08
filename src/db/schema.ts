@@ -7,6 +7,8 @@ export const images = sqliteTable('images', {
   r2Key: text('r2_key').notNull(),
   // フルサイズの元画像。r2Key は公開用に圧縮したもの。圧縮導入前の画像は両方同じキー
   originalR2Key: text('original_r2_key'),
+  // 作品一覧用の小さい画像。作る前の画像は null（公開用画像で代用）
+  thumbR2Key: text('thumb_r2_key'),
   width: integer('width'),
   height: integer('height'),
   createdAt: text('created_at').notNull(),

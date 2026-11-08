@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { imageKeys, shouldCompress, isPublicImageKey, contentDisposition, isAllowedUploadType, COMPRESS } from './imageFiles';
+import { imageKeys, shouldCompress, isPublicImageKey, contentDisposition, isAllowedUploadType, thumbSrc, COMPRESS, THUMB } from './imageFiles';
 
 const NOW = new Date('2026-11-07T09:00:00Z');
 
@@ -8,6 +8,7 @@ describe('imageKeys', () => {
     expect(imageKeys('abc123', 'photo.JPG', NOW)).toEqual({
       originalKey: 'originals/2026/11/abc123.jpg',
       displayKey: 'images/2026/11/abc123.webp',
+      thumbKey: 'thumbs/2026/11/abc123.webp',
     });
   });
 
@@ -73,5 +74,18 @@ describe('isAllowedUploadType', () => {
   test('自サイトで配るとスクリプトが動きうる形式は拒否する', () => {
     for (const t of ['image/svg+xml', 'text/html', 'application/octet-stream', '', 'image/jpeg; x=1'])
       expect(isAllowedUploadType(t)).toBe(false);
+  });
+});
+
+describe('サムネイル', () => {
+  test('長辺 400px・WebP 品質 75', () => {
+    expect(THUMB).toEqual({ maxEdge: 400, format: 'image/webp', quality: 75 });
+  });
+  test('thumbs/ は公開 URL で配ってよい', () => {
+    expect(isPublicImageKey('thumbs/2026/11/a.webp')).toBe(true);
+  });
+  test('サムネイルがあればそれ、なければ公開用画像を使う', () => {
+    expect(thumbSrc({ thumbR2Key: 'thumbs/2026/11/a.webp', r2Key: 'images/2026/11/a.webp' })).toBe('/api/images/thumbs/2026/11/a.webp');
+    expect(thumbSrc({ thumbR2Key: null, r2Key: 'images/2026/11/a.webp' })).toBe('/api/images/images/2026/11/a.webp');
   });
 });

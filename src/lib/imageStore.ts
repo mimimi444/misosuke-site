@@ -1,10 +1,13 @@
-import { COMPRESS, imageKeys, shouldCompress } from './imageFiles';
+import { COMPRESS, THUMB, imageKeys, shouldCompress } from './imageFiles';
+import { createThumbnail } from './thumbnails';
 
 export interface StoredImage {
   /** 公開用（圧縮済み）のキー */
   r2Key: string;
   /** フルサイズの元画像のキー */
   originalR2Key: string;
+  /** 作品一覧用の小さい画像のキー（作れなかったら null） */
+  thumbR2Key: string | null;
   width: number | null;
   height: number | null;
 }
@@ -51,7 +54,7 @@ export async function storeUploadedImage(params: {
   now: Date;
 }): Promise<StoredImage> {
   const { bucket, images, id, file, now } = params;
-  const { originalKey, displayKey } = imageKeys(id, file.name, now);
+  const { originalKey, displayKey, thumbKey } = imageKeys(id, file.name, now);
   const meta = { httpMetadata: { contentType: file.type } };
 
   await bucket.put(originalKey, file, meta);
@@ -62,10 +65,12 @@ export async function storeUploadedImage(params: {
       const compressed = await compress(images, file, originalSize);
       if (compressed.byteLength < file.size) {
         await bucket.put(displayKey, compressed, { httpMetadata: { contentType: COMPRESS.format } });
+        const displaySize = await measure(images, new Blob([compressed]).stream());
         return {
           r2Key: displayKey,
           originalR2Key: originalKey,
-          ...(await measure(images, new Blob([compressed]).stream())),
+          thumbR2Key: await storeThumbnail(bucket, images, thumbKey, compressed, displaySize),
+          ...displaySize,
         };
       }
     } catch (e) {
@@ -75,5 +80,21 @@ export async function storeUploadedImage(params: {
 
   const fallbackKey = originalKey.replace(/^originals\//, 'images/');
   await bucket.put(fallbackKey, file, meta);
-  return { r2Key: fallbackKey, originalR2Key: originalKey, ...originalSize };
+  // GIF はアニメーションが消えるので、サムネイルも作らず元のまま使う
+  const thumbR2Key = file.type === 'image/gif' ? null : await storeThumbnail(bucket, images, thumbKey, file.stream(), originalSize);
+  return { r2Key: fallbackKey, originalR2Key: originalKey, thumbR2Key, ...originalSize };
+}
+
+/** サムネイルを作って保存し、キーを返す。作れなければ null */
+export async function storeThumbnail(
+  bucket: R2Bucket,
+  images: ImagesBinding,
+  thumbKey: string,
+  source: ReadableStream<Uint8Array> | ArrayBuffer,
+  size: Size,
+): Promise<string | null> {
+  const bytes = await createThumbnail(images, source, size);
+  if (!bytes) return null;
+  await bucket.put(thumbKey, bytes, { httpMetadata: { contentType: THUMB.format } });
+  return thumbKey;
 }

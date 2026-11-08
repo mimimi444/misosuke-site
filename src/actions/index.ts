@@ -60,6 +60,7 @@ export const server = {
         description: input.description || null,
         r2Key: stored.r2Key,
         originalR2Key: stored.originalR2Key,
+        thumbR2Key: stored.thumbR2Key,
         width: stored.width,
         height: stored.height,
         createdAt: now.toISOString(),
@@ -111,7 +112,7 @@ export const server = {
       if (!image) throw new Error('Image not found');
 
       // 公開用と元画像（圧縮導入前の画像は同じキー）の両方を消す
-      await BUCKET.delete([...new Set([image.r2Key, image.originalR2Key ?? image.r2Key])]);
+      await BUCKET.delete([...new Set([image.r2Key, image.originalR2Key ?? image.r2Key, ...(image.thumbR2Key ? [image.thumbR2Key] : [])])]);
       await db.delete(images).where(eq(images.id, input.id));
     },
   }),

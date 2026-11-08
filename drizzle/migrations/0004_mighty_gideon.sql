@@ -1,0 +1,1 @@
+ALTER TABLE `images` ADD `thumb_r2_key` text;
