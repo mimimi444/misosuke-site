@@ -1,0 +1,94 @@
+---
+// 作品（画像 1 枚）のページ（平面版）。計画 3 で、同じ画面で開く作品詳細の直接アクセス先として作り替える。
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getDb } from '../../db/client';
+import { images, imageTags, tags, albums, albumImages } from '../../db/schema';
+import { eq, asc } from 'drizzle-orm';
+import { env } from 'cloudflare:workers';
+import { r2Url } from '../../lib/r2url';
+import { tagHref } from '../../lib/tags';
+import { albumHref } from '../../lib/albumSlug';
+import { altText, displayTitle, formatPostedDate } from '../../lib/workMeta';
+
+const id = Astro.params.id ?? '';
+const db = getDb(env.DB);
+
+const [image] = await db.select().from(images).where(eq(images.id, id));
+
+let tagNames: string[] = [];
+let inAlbums: { title: string; slug: string }[] = [];
+if (image) {
+  tagNames = (
+    await db.select({ name: tags.name }).from(imageTags).innerJoin(tags, eq(tags.id, imageTags.tagId))
+      .where(eq(imageTags.imageId, image.id)).orderBy(asc(tags.name))
+  ).map((t) => t.name);
+  inAlbums = await db.select({ title: albums.title, slug: albums.slug }).from(albumImages)
+    .innerJoin(albums, eq(albums.id, albumImages.albumId))
+    .where(eq(albumImages.imageId, image.id)).orderBy(asc(albums.createdAt));
+} else {
+  Astro.response.status = 404;
+}
+
+const title = image ? displayTitle(image.title) : '見つかりません';
+const description = image?.description?.trim() ?? '';
+---
+
+<BaseLayout title={title} description={description.slice(0, 120)}>
+  {image ? (
+    <article class="work">
+      <figure class="work-figure">
+        <img
+          src={r2Url(image.r2Key)}
+          alt={altText(image)}
+          width={image.width ?? undefined}
+          height={image.height ?? undefined}
+        />
+      </figure>
+
+      <div class="work-info panel">
+        <p class="hud-label">WORK / {formatPostedDate(image.createdAt)}</p>
+        <h1 class="work-title">{title}</h1>
+        {description && <p class="work-description">{description}</p>}
+        {tagNames.length > 0 && (
+          <ul class="row work-tags" aria-label="タグ">
+            {tagNames.map((name) => <li><a href={tagHref(name)} class="chip">#{name}</a></li>)}
+          </ul>
+        )}
+        {inAlbums.length > 0 && (
+          <p class="work-albums">
+            <span class="hud-label">ALBUM</span>
+            {inAlbums.map((a) => <a href={albumHref(a.slug)}>{a.title}</a>)}
+          </p>
+        )}
+      </div>
+    </article>
+  ) : (
+    <div class="work-missing empty">
+      <p>作品が見つかりません。</p>
+    </div>
+  )}
+</BaseLayout>
+
+<style>
+  .work {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: clamp(1rem, 3vw, 2.5rem);
+    align-items: start;
+    padding: clamp(1rem, 3vw, 2.5rem);
+  }
+  @media (max-width: 860px) { .work { grid-template-columns: 1fr; } }
+
+  .work-figure { margin: 0; display: flex; justify-content: center; }
+  /* 絵は本来の縦横比で、画面に収まる大きさまで */
+  .work-figure img { width: auto; height: auto; max-width: 100%; max-height: calc(100vh - var(--header-h) - 4rem); }
+
+  .work-info { display: flex; flex-direction: column; gap: 0.75rem; position: sticky; top: calc(var(--header-h) + 1rem); }
+  .work-title { font-size: 1.25rem; font-weight: 700; line-height: 1.4; overflow-wrap: anywhere; }
+  .work-description { font-size: 0.9rem; color: var(--ink-muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .work-tags { list-style: none; gap: 0.4rem; }
+  .work-albums { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem; font-size: 0.85rem; }
+  .work-albums a { color: var(--accent); }
+
+  .work-missing { margin: 3rem clamp(1rem, 3vw, 2.5rem); }
+</style>
