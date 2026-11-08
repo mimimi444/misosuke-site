@@ -1,10 +1,11 @@
 import { useState, useRef, useCallback } from 'react';
-import { composePostText, countGraphemes, splitTagNames, POST_MAX_GRAPHEMES } from '../lib/social/compose';
+import { composePostText, countGraphemes, splitTagNames, placeholderWorkUrl, POST_MAX_GRAPHEMES } from '../lib/social/compose';
 
 interface FileItem {
   file: File;
   previewUrl: string;
   title: string;
+  description: string;
   tagNames: string;
   postToBluesky: boolean;
   attachImage: boolean;
@@ -36,6 +37,7 @@ export default function UploadForm({ tagSuggestions, siteUrl }: Props) {
       file: f,
       previewUrl: URL.createObjectURL(f),
       title: '',
+      description: '',
       tagNames: '',
       postToBluesky: false,
       attachImage: true,
@@ -73,13 +75,15 @@ export default function UploadForm({ tagSuggestions, siteUrl }: Props) {
       ...item,
       postText: composePostText({
         title: item.title,
+        description: item.description,
         tagNames: splitTagNames(item.tagNames),
-        url: item.includeLink ? siteUrl : null,
+        // 作品ページの URL は投稿時に決まるので、ここでは同じ長さの仮の URL を入れる
+        url: item.includeLink ? placeholderWorkUrl(siteUrl) : null,
       }),
     };
   };
 
-  const updateItem = (i: number, field: 'title' | 'tagNames', value: string) => {
+  const updateItem = (i: number, field: 'title' | 'description' | 'tagNames', value: string) => {
     setItems(prev => prev.map((item, idx) => idx === i ? withComposedText({ ...item, [field]: value }) : item));
   };
 
@@ -105,6 +109,7 @@ export default function UploadForm({ tagSuggestions, siteUrl }: Props) {
       const fd = new FormData();
       fd.append('file', item.file);
       if (item.title) fd.append('title', item.title);
+      if (item.description) fd.append('description', item.description);
       if (item.tagNames) fd.append('tagNames', item.tagNames);
       if (item.postToBluesky) {
         fd.append('postToBluesky', 'true');
@@ -206,6 +211,16 @@ export default function UploadForm({ tagSuggestions, siteUrl }: Props) {
                     />
                   </div>
                   <div className="form-group">
+                    <label htmlFor={`description-${i}`}>作品説明</label>
+                    <textarea
+                      id={`description-${i}`}
+                      placeholder="（任意）作品について"
+                      rows={3}
+                      value={item.description}
+                      onChange={e => updateItem(i, 'description', e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
                     <label htmlFor={`tags-${i}`}>タグ（カンマ区切り）</label>
                     <input
                       id={`tags-${i}`}
@@ -272,6 +287,9 @@ export default function UploadForm({ tagSuggestions, siteUrl }: Props) {
                           </p>
                         );
                       })()}
+                      {item.postToBluesky && item.includeLink && (
+                        <p className="post-edited-note">文面の URL（…/works/xxxx）は、投稿時にこの作品のページの URL に置き換わります。</p>
+                      )}
                     </div>
                   </fieldset>
                 </div>

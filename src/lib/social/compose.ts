@@ -63,3 +63,20 @@ export function composePostText(input: ComposeInput): string {
 
   return clampPostText(join(description));
 }
+
+/**
+ * アップロード前は作品 ID が決まっていないので、文面の作品 URL には仮の ID を入れておく。
+ * nanoid と同じ 21 文字にして、文字数の表示が実際とずれないようにする。
+ */
+export const WORK_ID_PLACEHOLDER = 'x'.repeat(21);
+
+/** 仮の作品 URL を含む文面にするための URL（アップロード画面の自動作成で使う） */
+export function placeholderWorkUrl(siteUrl: string): string {
+  return new URL(`works/${WORK_ID_PLACEHOLDER}`, siteUrl).href;
+}
+
+/** 文面中の仮の作品 URL を、実際の作品 URL に置き換える。含まれていなければそのまま */
+export function resolvePostText(text: string, siteUrl: string, workId: string): string {
+  const real = new URL(`works/${encodeURIComponent(workId)}`, siteUrl).href;
+  return text.split(placeholderWorkUrl(siteUrl)).join(real);
+}

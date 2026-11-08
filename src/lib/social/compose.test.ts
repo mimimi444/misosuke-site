@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { composePostText, clampPostText, countGraphemes, splitTagNames } from './compose';
+import { composePostText, clampPostText, countGraphemes, splitTagNames, resolvePostText, WORK_ID_PLACEHOLDER } from './compose';
 
 const URL = 'https://misosuke-site.misosuke.workers.dev/';
 
@@ -87,5 +87,23 @@ describe('splitTagNames', () => {
   test('カンマで分けて空白と空要素を除く', () => {
     expect(splitTagNames(' a, b ,,c ')).toEqual(['a', 'b', 'c']);
     expect(splitTagNames(undefined)).toEqual([]);
+  });
+});
+
+describe('resolvePostText', () => {
+  const SITE = 'https://misosuke-site.misosuke.workers.dev/';
+  const ph = `${SITE}works/${WORK_ID_PLACEHOLDER}`;
+
+  test('仮の作品 URL を実際の作品 URL に置き換える', () => {
+    expect(resolvePostText(`T\n${ph}`, SITE, 'abc')).toBe(`T\n${SITE}works/abc`);
+  });
+  test('複数あればすべて置き換える', () => {
+    expect(resolvePostText(`${ph} と ${ph}`, SITE, 'abc')).toBe(`${SITE}works/abc と ${SITE}works/abc`);
+  });
+  test('仮の URL が含まれていなければ、そのまま（勝手に URL を足さない）', () => {
+    expect(resolvePostText('リンクなし', SITE, 'abc')).toBe('リンクなし');
+  });
+  test('仮の ID は nanoid と同じ 21 文字（文字数の表示がずれない）', () => {
+    expect(WORK_ID_PLACEHOLDER).toHaveLength(21);
   });
 });

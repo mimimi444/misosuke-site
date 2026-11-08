@@ -72,11 +72,19 @@ function parseTagList(tagList: string | null): string[] {
                 class="edit-title"
                 placeholder="タイトル"
                 value={img.title ?? ''}
+                aria-label="タイトル"
               />
+              <textarea
+                class="edit-description"
+                placeholder="作品説明"
+                aria-label="作品説明"
+                rows="3"
+              >{img.description ?? ''}</textarea>
               <input
                 type="text"
                 class="edit-tags"
                 placeholder="タグ（カンマ区切り）"
+                aria-label="タグ"
                 value={tagList.join(', ')}
               />
               <div class="edit-actions">
@@ -119,7 +127,8 @@ function parseTagList(tagList: string | null): string[] {
 
   .image-manage-body { padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; }
   .edit-form { display: flex; flex-direction: column; gap: 0.5rem; }
-  .edit-form input { font-size: 0.8rem; padding: 0.4rem 0.55rem; }
+  .edit-form input, .edit-form textarea { font-size: 0.8rem; padding: 0.4rem 0.55rem; }
+  .edit-form textarea { min-height: 3.5rem; }
   .edit-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
   .image-meta { padding-top: 0.25rem; }
 
@@ -160,11 +169,12 @@ function parseTagList(tagList: string | null): string[] {
       const id = form.dataset.id!;
       const title = (form.querySelector('.edit-title') as HTMLInputElement).value;
       const tagNames = (form.querySelector('.edit-tags') as HTMLInputElement).value;
+      const description = (form.querySelector('.edit-description') as HTMLTextAreaElement).value;
 
       const res = await fetch('/_actions/updateImage', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, title, tagNames }),
+        body: JSON.stringify({ id, title, description, tagNames }),
       });
 
       showToast(res.ok ? '保存しました' : '保存に失敗しました');

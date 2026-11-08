@@ -6,7 +6,8 @@ import { nanoid } from 'nanoid';
 import { eq, inArray } from 'drizzle-orm';
 import { env } from 'cloudflare:workers';
 import { formBoolean } from '../lib/form';
-import { clampPostText, composePostText, splitTagNames } from '../lib/social/compose';
+import { clampPostText, composePostText, resolvePostText, splitTagNames } from '../lib/social/compose';
+import { workPath } from '../lib/workMeta';
 import { publishImageToBluesky } from '../lib/social/publish';
 import { storeUploadedImage } from '../lib/imageStore';
 import { isAllowedUploadType } from '../lib/imageFiles';
@@ -67,14 +68,16 @@ export const server = {
       if (input.tagNames) await attachTags(db, id, input.tagNames);
 
       if (input.postToBluesky) {
+        // 投稿のリンクは、この作品のページ（/works/<ID>）
+        const site = context.site?.href ?? '';
         const edited = input.postText?.trim();
         const text = edited
-          ? clampPostText(edited)
+          ? clampPostText(resolvePostText(edited, site, id))
           : composePostText({
               title: input.title,
               description: input.description,
               tagNames: splitTagNames(input.tagNames),
-              url: input.includeLink ? context.site?.href ?? null : null,
+              url: input.includeLink && site ? new URL(workPath(id), site).href : null,
             });
         // 投稿の完了は待たずに返す。失敗は bluesky_posts に記録される
         context.locals.cfContext.waitUntil(
