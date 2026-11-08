@@ -19,7 +19,7 @@ type ImageRow = typeof images.$inferSelect & { tagList: string | null };
 let imageRows: ImageRow[] = [];
 let totalCount = 0;
 /** 画像 ID → ビューワーで開くアルバムの slug（2 ページ以上のアルバムに入っている画像だけ） */
-let imageAlbums = new Map<string, string>();
+let imageAlbums = new Map<string, { slug: string; page: number }>();
 
 try {
   const db = getDb(env.DB);
@@ -81,7 +81,7 @@ function parseTagList(tagList: string | null): string[] {
                 data-image-id={img.id}
                 data-src={r2Url(img.r2Key)}
                 data-title={img.title ?? ''}
-                data-album={imageAlbums.get(img.id)}
+                data-album={imageAlbums.get(img.id)?.slug}
                 aria-label={`${img.title || '画像'}を${imageAlbums.has(img.id) ? 'アルバムで' : '拡大して'}表示`}
               ></button>
               <img
