@@ -10,7 +10,8 @@ interface Props {
   fallback: Showcase | null;
 }
 const { candidates, fallback } = Astro.props;
-const spread = fallback ? [fallback.pages[0], fallback.pages[1]].filter(Boolean) : [];
+// 最初の見開き: 左は表紙の内側（無地）、右に 1 枚目の絵
+const firstPage = fallback?.pages[0];
 // JavaScript 前・WebGL なしのときのリンク先（最初の見開きの 1 ページ目）
 const first = fallback?.pages[0];
 const fallbackHref = !fallback || !first ? '#' : fallback.kind === 'album' ? railHref(first.id, { slug: fallback.slug, page: 1 }) : workPath(first.id);
@@ -20,7 +21,8 @@ const fallbackHref = !fallback || !first ? '#' : fallback.kind === 'album' ? rai
   {fallback ? (
     <>
       <div class="showcase-flat" aria-hidden="false">
-        {spread.map((p) => p && <img src={p.src} alt={p.title} />)}
+        <span class="showcase-flat-blank" aria-hidden="true"></span>
+        {firstPage && <img src={firstPage.src} alt={firstPage.title} />}
       </div>
       <canvas class="showcase-canvas" hidden aria-label={`${fallback.title} のページがめくれる様子`}></canvas>
       <a class="showcase-hit" href={fallbackHref} aria-label={`${fallback.title} を見る`}></a>
@@ -30,7 +32,7 @@ const fallbackHref = !fallback || !first ? '#' : fallback.kind === 'album' ? rai
         <p class="showcase-title" data-role="title">{fallback.title}</p>
         <p class="hud-label" data-role="count">{fallback.pages.length} PAGES</p>
       </div>
-      <p class="showcase-hud showcase-turn hud-label" data-role="turn">AUTO TURN ・ 01 / {String(Math.ceil(fallback.pages.length / 2)).padStart(2, '0')}</p>
+      <p class="showcase-hud showcase-turn hud-label" data-role="turn">AUTO TURN ・ 01 / {String(fallback.pages.length).padStart(2, '0')}</p>
       <p class="showcase-hud showcase-state state-label" data-role="state">HOLDING</p>
 
       <script type="application/json" data-role="candidates" set:html={JSON.stringify(candidates).replace(/</g, '\\u003c')}></script>
@@ -63,6 +65,7 @@ const fallbackHref = !fallback || !first ? '#' : fallback.kind === 'album' ? rai
     padding: 1.2rem;
     box-shadow: var(--shadow-strong);
   }
+  .showcase-flat-blank { width: 42%; aspect-ratio: 3 / 4; max-height: 80%; background: var(--cover-inner); box-shadow: var(--shadow-strong); }
   .showcase[data-mode="3d"] .showcase-flat { display: none; }
 
   .showcase-hit { position: absolute; inset: 0; z-index: 1; }

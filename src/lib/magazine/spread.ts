@@ -1,16 +1,18 @@
 // 雑誌のページと紙（leaf）の対応。three.js に依存しない。
 
 export type MagazinePage = { id: string; src: string; title: string };
-export type Leaf = { front: MagazinePage | null; back: MagazinePage | null };
 
 /**
- * 画像 1 枚 = 紙の片面 1 ページ。最初の見開きの左は表紙の内側（無地）なので、
- * 紙の表＝右ページ、裏＝次の見開きの左ページ。最後の裏が無ければ裏表紙の内側（無地）。
+ * 紙 1 枚に絵 1 枚。表に絵を載せ、裏には同じ絵が紙の裏から透けて見える（左右反転・薄く）。
+ * めくると、左ページには直前まで右にあった絵の透けが、右ページには次の絵が来る。
  */
+export type Leaf = { page: MagazinePage; back: 'ghost' };
+
 export function buildLeaves(pages: MagazinePage[]): Leaf[] {
-  const leaves: Leaf[] = [];
-  for (let i = 0; i < pages.length; i += 2) {
-    leaves.push({ front: pages[i]!, back: pages[i + 1] ?? null });
-  }
-  return leaves;
+  return pages.map((page) => ({ page, back: 'ghost' as const }));
+}
+
+/** めくり終えた枚数から、右ページに見えている絵の位置（すべてめくり終えたら最後の絵に留める） */
+export function rightPageIndex(flippedCount: number, pageCount: number): number {
+  return Math.max(0, Math.min(flippedCount, pageCount - 1));
 }

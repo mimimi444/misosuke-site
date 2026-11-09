@@ -28,7 +28,6 @@ async function setup(root: HTMLElement) {
     const el = root.querySelector(`[data-role="${role}"]`);
     if (el) el.textContent = text;
   };
-  const leafCount = Math.max(1, Math.ceil(show.pages.length / 2));
   set('title', show.title);
   set('count', `${show.pages.length} PAGES`);
   hit.href = hrefFor(show, 0);
@@ -39,9 +38,9 @@ async function setup(root: HTMLElement) {
     await createShowcaseScene(canvas, {
       pages: show.pages,
       reducedMotion,
-      onState: ({ state, page, rightPageIndex }) => {
+      onState: ({ state, page, total, rightPageIndex }) => {
         set('state', state);
-        set('turn', `${reducedMotion ? 'MANUAL' : 'AUTO TURN'} ・ ${String(page).padStart(2, '0')} / ${String(leafCount).padStart(2, '0')}`);
+        set('turn', `${reducedMotion ? 'MANUAL' : 'AUTO TURN'} ・ ${String(page).padStart(2, '0')} / ${String(total).padStart(2, '0')}`);
         hit.href = hrefFor(show, rightPageIndex);
       },
     });

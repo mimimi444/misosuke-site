@@ -8,7 +8,8 @@ import { BokehPass } from 'three/addons/postprocessing/BokehPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { PAPER, leafOffsets, shapePage, vertexCount } from './pageShape';
 import { cycleLength, forwardEnd, leafProgress } from './schedule';
-import { buildLeaves, type MagazinePage } from './spread';
+import { buildLeaves, rightPageIndex as rightIndexOf } from './spread';
+import type { MagazinePage } from './spread';
 
 export type ShowcaseState = { state: 'TURNING' | 'HOLDING' | 'RIFFLE'; page: number; total: number; rightPageIndex: number };
 
@@ -42,8 +43,14 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
   });
 }
 
-/** 生成りの紙に作品を余白付きで描いたテクスチャ（作品が無ければ無地の紙） */
-function paperTexture(img: HTMLImageElement | null, mirror: boolean, colors: { sheet: string; ink: string; speck: string }): THREE.CanvasTexture {
+/** 紙の裏から透けて見える絵の濃さ */
+const GHOST_ALPHA = 0.22;
+
+/**
+ * 生成りの紙に作品を余白付きで描いたテクスチャ（作品が無ければ無地の紙）。
+ * ghost では、表の絵が紙の裏から透けて見えるように薄く描く（裏面に貼ると左右反転して見える）。
+ */
+function paperTexture(img: HTMLImageElement | null, ghost: boolean, colors: { sheet: string; ink: string; speck: string }): THREE.CanvasTexture {
   const c = document.createElement('canvas');
   c.width = 900;
   c.height = 1200;
@@ -57,15 +64,18 @@ function paperTexture(img: HTMLImageElement | null, mirror: boolean, colors: { s
     const m = 70, boxW = c.width - m * 2, boxH = c.height - m * 2 - 90;
     const scale = Math.min(boxW / img.naturalWidth, boxH / img.naturalHeight);
     const w = img.naturalWidth * scale, h = img.naturalHeight * scale;
+    g.globalAlpha = ghost ? GHOST_ALPHA : 1;
     g.drawImage(img, m + (boxW - w) / 2, m + (boxH - h) / 2, w, h);
-    g.fillStyle = colors.ink;
-    g.font = '22px monospace';
-    g.fillText('JUNK JOURNAL JOURNEY', m, c.height - 70);
+    g.globalAlpha = 1;
+    if (!ghost) {
+      g.fillStyle = colors.ink;
+      g.font = '22px monospace';
+      g.fillText('JUNK JOURNAL JOURNEY', m, c.height - 70);
+    }
   }
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 8;
-  if (mirror) { t.wrapS = THREE.RepeatWrapping; t.repeat.x = -1; }
   return t;
 }
 
@@ -145,12 +155,13 @@ export async function createShowcaseScene(
   scene.add(magazine);
   const leaves = buildLeaves(opts.pages);
   const images = await Promise.all(opts.pages.map((p) => loadImage(p.src)));
-  const imageOf = (page: MagazinePage | null) => (page ? images[opts.pages.indexOf(page)] ?? null : null);
 
-  const leafGeos = leaves.map((leaf) => {
+  const leafGeos = leaves.map((leaf, i) => {
     const geo = pageGeometry();
-    const front = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: paperTexture(imageOf(leaf.front), false, colors), side: THREE.FrontSide, roughness: 0.92 }));
-    const back = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: paperTexture(imageOf(leaf.back), true, colors), side: THREE.BackSide, roughness: 0.92 }));
+    const img = images[i] ?? null;
+    // 表は絵、裏は同じ絵の透け（裏面に貼るので左右反転して見える）
+    const front = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: paperTexture(img, false, colors), side: THREE.FrontSide, roughness: 0.92 }));
+    const back = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: paperTexture(img, true, colors), side: THREE.BackSide, roughness: 0.92 }));
     magazine.add(front, back);
     return geo;
   });
@@ -236,11 +247,11 @@ export async function createShowcaseScene(
 
     const local = time % cycleLength(n);
     const state: ShowcaseState['state'] = motion && local > forwardEnd(n) ? 'RIFFLE' : flipping ? 'TURNING' : 'HOLDING';
-    const rightPageIndex = Math.min(done * 2, Math.max(0, opts.pages.length - 1));
+    const rightPageIndex = rightIndexOf(done, opts.pages.length);
     const summary = `${state}|${done}`;
     if (summary !== lastState) {
       lastState = summary;
-      opts.onState?.({ state, page: Math.min(done + 1, Math.max(n, 1)), total: Math.max(n, 1), rightPageIndex });
+      opts.onState?.({ state, page: rightPageIndex + 1, total: Math.max(opts.pages.length, 1), rightPageIndex });
     }
 
     if (motion) {
