@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest';
-import { pickShowcase, defaultShowcase, type ShowcaseCandidates } from './showcase';
+import { pickShowcase, defaultShowcase, MAX_MAGAZINE_PAGES, type ShowcaseCandidates } from './showcase';
 import type { MagazinePage } from './magazine/spread';
 
 const s = (i: number): MagazinePage => ({ id: `s${i}`, src: `/s${i}.webp`, title: `single ${i}` });
@@ -36,4 +36,11 @@ test('JavaScript 前の固定内容は、最新のアルバム（候補の先頭
 test('アルバムが無ければ、最新の 1 枚ものを最大 6 枚', () => {
   const singles = Array.from({ length: 8 }, (_, i) => s(i));
   expect(defaultShowcase({ albums: [], singles })).toEqual({ kind: 'singles', title: '新着', pages: singles.slice(0, 6) });
+});
+
+test('ページ数の多いアルバムは、先頭の 12 ページだけを雑誌にする（読み込みとメモリを抑える）', () => {
+  const big = { slug: 'big', title: '分厚い', pages: Array.from({ length: 30 }, (_, i) => page(`p${i}`)) };
+  expect(MAX_MAGAZINE_PAGES).toBe(12);
+  expect(pickShowcase({ albums: [big], singles: [] }, () => 0)!.pages.map((p) => p.id)).toEqual(big.pages.slice(0, 12).map((p) => p.id));
+  expect(defaultShowcase({ albums: [big], singles: [] })!.pages).toHaveLength(12);
 });

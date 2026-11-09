@@ -14,6 +14,8 @@ export type Showcase =
 
 /** 1 枚ものを束ねた「仮の雑誌」の最大枚数 */
 const MAX_SINGLES = 6;
+/** 雑誌として開く最大ページ数。分厚いアルバムでも、画像の読み込みと GPU のメモリを抑える */
+export const MAX_MAGAZINE_PAGES = 12;
 
 function singlesShowcase(pages: MagazinePage[], bundleTitle: string): Showcase {
   return { kind: 'singles', title: pages.length === 1 ? pages[0]!.title : bundleTitle, pages };
@@ -26,7 +28,7 @@ export function pickShowcase(c: ShowcaseCandidates, random: () => number): Showc
   const index = Math.min(options - 1, Math.floor(random() * options));
   if (index < c.albums.length) {
     const a = c.albums[index]!;
-    return { kind: 'album', slug: a.slug, title: a.title, pages: a.pages };
+    return { kind: 'album', slug: a.slug, title: a.title, pages: a.pages.slice(0, MAX_MAGAZINE_PAGES) };
   }
   // 1 枚ものから重複なく選ぶ（部分的なシャッフル）
   const pool = [...c.singles];
@@ -41,7 +43,7 @@ export function pickShowcase(c: ShowcaseCandidates, random: () => number): Showc
 /** JavaScript が動く前の HTML に入れる固定の内容（最新のアルバム、なければ最新の 1 枚もの） */
 export function defaultShowcase(c: ShowcaseCandidates): Showcase | null {
   const a = c.albums[0];
-  if (a) return { kind: 'album', slug: a.slug, title: a.title, pages: a.pages };
+  if (a) return { kind: 'album', slug: a.slug, title: a.title, pages: a.pages.slice(0, MAX_MAGAZINE_PAGES) };
   if (c.singles.length === 0) return null;
   return singlesShowcase(c.singles.slice(0, MAX_SINGLES), '新着');
 }

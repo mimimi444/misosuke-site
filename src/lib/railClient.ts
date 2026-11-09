@@ -6,6 +6,7 @@ import type { RailItem } from './rail';
 const SPEED = 22;          // 流れる速さ（px/秒）
 const EASE = 4;            // 速度が目標に近づく速さ（大きいほど早く止まる・戻る）
 const PREFETCH_PX = 600;   // 残りがこれより少なくなったら続きを読み足す
+const MAX_FAILURES = 4;    // 読み足しがこの回数続けて失敗したら諦める（失敗のたびに待ち時間を倍にする）
 
 type State = {
   root: HTMLElement;
@@ -22,6 +23,9 @@ type State = {
   tapped: HTMLAnchorElement | null;
   nextCursor: string;
   loading: boolean;
+  /** 読み足しの連続失敗回数と、次に試してよい時刻 */
+  failures: number;
+  retryAt: number;
   looping: boolean;
 };
 
@@ -83,13 +87,20 @@ function cellHtml(item: RailItem): HTMLLIElement {
 }
 
 async function loadMore(s: State) {
-  if (s.loading || !s.nextCursor) return;
+  if (s.loading || !s.nextCursor || performance.now() < s.retryAt) return;
   s.loading = true;
   try {
     const params = new URLSearchParams({ cursor: s.nextCursor });
     if (s.root.dataset.tag) params.set('tag', s.root.dataset.tag);
-    const res = await fetch(`/api/rail?${params}`);
-    if (!res.ok) return;
+    const res = await fetch(`/api/rail?${params}`).catch(() => null);
+    if (!res || !res.ok) {
+      // 失敗が続いても毎フレーム送り続けないよう、待ち時間を 2, 4, 8 秒…と伸ばし、続けて失敗したら諦める
+      s.failures++;
+      if (s.failures >= MAX_FAILURES) s.nextCursor = '';
+      else s.retryAt = performance.now() + 1000 * 2 ** s.failures;
+      return;
+    }
+    s.failures = 0;
     const page = (await res.json()) as { items: RailItem[]; nextCursor: string | null };
     const firstClone = s.track.querySelector('[data-clone]');
     for (const item of page.items) s.track.insertBefore(cellHtml(item), firstClone);
@@ -155,9 +166,31 @@ function setup(root: HTMLElement) {
     tapped: null,
     nextCursor: root.dataset.nextCursor ?? '',
     loading: false,
+    failures: 0,
+    retryAt: 0,
     looping: false,
   };
   root.dataset.orientation = s.vertical ? 'vertical' : 'horizontal';
+
+  // 画面の幅が境目（768px）をまたいだら縦横を切り替え、大きさが変わったらループを組み直す
+  // （タブレットの回転やウィンドウの幅の変更で、レイアウトが崩れたり空白が流れたりしないように）
+  const wide = matchMedia('(min-width: 769px)');
+  wide.addEventListener('change', () => {
+    s.vertical = wide.matches;
+    root.dataset.orientation = s.vertical ? 'vertical' : 'horizontal';
+    hidePop(s);
+    s.holding = false;
+    s.offset = 0;
+    applyOffset(s);
+    rebuildLoop(s);
+  });
+  let lastSize = '';
+  new ResizeObserver(() => {
+    const size = `${viewport.clientWidth}x${viewport.clientHeight}`;
+    if (size === lastSize) return;
+    lastSize = size;
+    rebuildLoop(s);
+  }).observe(viewport);
   if (reduced) root.dataset.static = '';
   root.dataset.pointer = matchMedia('(hover: hover)').matches ? 'mouse' : 'touch';
   rebuildLoop(s);

@@ -148,6 +148,7 @@ const pagesJson = JSON.stringify(
 
 <script>
   import { createMangaViewer } from '@yui540/comimi';
+  import { pageIndexFromSearch } from '../../lib/links';
 
   const overlay = document.getElementById('viewerOverlay') as HTMLDivElement | null;
   const closeBtn = document.getElementById('closeViewerBtn');
@@ -169,12 +170,16 @@ const pagesJson = JSON.stringify(
       active?.scrollIntoView({ block: 'nearest' });
     }
 
+    // 作品一覧や雑誌から ?page=N 付きで来たら、そのページから開く（保存された位置より優先）
+    const startIndex = pageIndexFromSearch(location.search, pages.length);
+
     const viewer = createMangaViewer(container, {
       manga: {
         id: albumSlug,
         title: albumTitle,
         pages: pages.map(p => ({ id: p.id, type: 'image' as const, src: p.src })),
       },
+      initialPageIndex: startIndex ?? undefined,
       locale: 'ja',
       settings: {
         readingDirection: 'rtl',
@@ -182,11 +187,13 @@ const pagesJson = JSON.stringify(
         layoutMode: 'inline',
         backgroundColor: 'black', // comimi の背景テーマ名（CSS の色ではない） consistency-allow
       },
-      storage: { enabled: true },
+      storage: { enabled: startIndex === null },
       events: {
         pageChange: ({ pageIndex }: { pageIndex: number }) => updateActiveThumb(pageIndex),
       },
     });
+    if (startIndex !== null) viewer.goToPage(startIndex);
+    updateActiveThumb(startIndex ?? 0);
 
     // サムネクリックでページ移動
     thumbsEl.querySelectorAll<HTMLButtonElement>('.viewer-thumb').forEach((btn, i) => {
