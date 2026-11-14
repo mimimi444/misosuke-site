@@ -9,6 +9,9 @@ interface Props {
 }
 const { variant, loggedIn = false } = Astro.props;
 const pathname = Astro.url.pathname;
+// 作品詳細（/albums/<slug>・/works/<id>）はトップと同じ画面の上に開くので FEED を選んだ状態にする
+const onAlbumList = /^\/albums\/?$/.test(pathname);
+const onFeed = pathname === '/' || pathname.startsWith('/works/') || (pathname.startsWith('/albums/') && !onAlbumList);
 ---
 
 <header class="site-header">
@@ -21,8 +24,8 @@ const pathname = Astro.url.pathname;
   <nav class="site-nav" aria-label="サイト内">
     {variant === 'public' ? (
       <>
-        <a href="/" class:list={['nav-link', { active: pathname === '/' }]}>FEED</a>
-        <a href="/albums" class:list={['nav-link', { active: pathname.startsWith('/albums') }]}>ALBUMS</a>
+        <a href="/" class:list={['nav-link', { active: onFeed }]}>FEED</a>
+        <a href="/albums" class:list={['nav-link', { active: onAlbumList }]}>ALBUMS</a>
         {loggedIn && <a href={adminHref('')} class="nav-link nav-admin" rel="nofollow">管理画面</a>}
       </>
     ) : (

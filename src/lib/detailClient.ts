@@ -41,6 +41,8 @@ let api: ShowcaseApi | null = null;
 let returnFocus: HTMLElement | null = null;
 /** 開くたびに増やす（閉じた後・開き直した後に、古い非同期の続きを捨てる） */
 let generation = 0;
+/** 詳細を閉じたときのタブの題名（開いた元の一覧の題名） */
+let listTitle = 'JJJ';
 
 export function setDetailHandlers(h: DetailHandlers): void {
   handlers = h;
@@ -178,15 +180,21 @@ export async function openDetail(next: DetailData, opts: { returnFocus?: HTMLEle
   els.root.hidden = false;
   resetZoom();
   render();
+  document.title = `${next.title} — JJJ`;
   role('title').focus({ preventScroll: true });
+  // URL のページ番号を、実際に開いたページに合わせる（範囲外の ?page など）
+  handlers.onPageChange?.(index, next);
 
   const gen = ++generation;
   const stage = await whenStage();
   if (gen !== generation || !stage) return;
   api = stage;
   api.onPage = undefined;
-  await api.read({ pages: next.pages, startIndex: index, insets: currentInsets() });
+  const startIndex = index;
+  await api.read({ pages: next.pages, startIndex, insets: currentInsets() });
   if (gen !== generation) return;
+  // 3D の準備中に送られたページに合わせる
+  if (index !== startIndex) api.jumpTo(index);
   els.root.dataset.mode = '3d';
   els.flatImg.style.transform = '';
   applyZoom(zoom);
@@ -201,14 +209,17 @@ export function closeDetail(): void {
   delete els.root.dataset.mode;
   api?.show();
   data = null;
+  document.title = listTitle;
   const back = returnFocus;
   returnFocus = null;
-  if (back?.isConnected) back.focus({ preventScroll: true });
+  // 開いた元のリンクが無ければ（直接開いた）、雑誌へのリンクにフォーカスを置く
+  const fallback = document.querySelector<HTMLElement>('.showcase-hit');
+  (back?.isConnected ? back : fallback)?.focus({ preventScroll: true });
 }
 
 function focusables(): HTMLElement[] {
   return [...els!.root.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])')]
-    .filter((e) => !e.closest('[hidden]') && e.offsetParent !== null);
+    .filter((e) => !e.closest('[hidden]') && e.offsetParent !== null && getComputedStyle(e).visibility !== 'hidden');
 }
 
 function onKey(e: KeyboardEvent) {
@@ -303,7 +314,12 @@ function bindGestures(view: HTMLElement) {
   const end = (e: PointerEvent, cancelled: boolean) => {
     if (!pts.has(e.pointerId)) return;
     pts.delete(e.pointerId);
-    if (pts.size < 2) pinch = null;
+    if (pts.size < 2 && pinch) {
+      pinch = null;
+      // 残った指でのドラッグは、今の位置と倍率から続ける（表示が跳ばないように）
+      const rest = [...pts.values()][0];
+      if (rest) start = { x: rest.x, y: rest.y, t: 0, zoom: { ...zoom } };
+    }
     if (pts.size > 0 || !start) return;
     const s = start;
     start = null;
@@ -363,6 +379,8 @@ export function initDetail(): void {
     api?.setInsets(currentInsets());
     applyZoom(zoom);
   }).observe(els.view);
+
+  listTitle = root.hidden ? document.title : 'JJJ';
 
   // サーバーが詳細を開いた状態で返したとき
   const json = root.querySelector<HTMLScriptElement>('[data-role="detail-data"]');

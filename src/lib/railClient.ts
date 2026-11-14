@@ -207,7 +207,9 @@ function setup(root: HTMLElement) {
   });
   track.addEventListener('focusin', (e) => {
     const a = (e.target as Element).closest<HTMLAnchorElement>('.rail-item');
-    if (a) { s.holding = true; showPop(s, a); }
+    // キーボードのフォーカスだけで止める（詳細をマウスで閉じてフォーカスが戻ったときに止まったままにしない。
+    // タップは click 側で選ぶ）
+    if (a && a.matches(':focus-visible')) { s.holding = true; showPop(s, a); }
   });
   track.addEventListener('focusout', () => {
     if (root.dataset.pointer === 'touch' && s.tapped) return; // タップで選んだ状態は、外側のタップで解除する

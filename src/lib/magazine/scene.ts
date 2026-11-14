@@ -43,6 +43,8 @@ export type ShowcaseApi = {
   show(): void;
   /** 読むモードで 1 枚めくる */
   turn(delta: 1 | -1): void;
+  /** 読むモードで、めくらずに index の絵を右ページに開く（準備中に送られたページに合わせる） */
+  jumpTo(index: number): void;
   setZoom(z: Zoom): void;
   setInsets(i: Insets): void;
   /** めくり終わったとき（読むモード） */
@@ -135,11 +137,13 @@ function pageGeometry(): THREE.BufferGeometry {
 
 function updateShape(
   geo: THREE.BufferGeometry, p: number, offRight: number, offLeft: number, air: number, flutter: number, flatten = 0,
+  normals = true,
 ) {
   const attr = geo.attributes.position as THREE.BufferAttribute;
   shapePage(attr.array as Float32Array, p, offRight, offLeft, air, flutter, flatten);
   attr.needsUpdate = true;
-  geo.computeVertexNormals();
+  // 照明を受けない読むモードの紙では法線は使わない
+  if (normals) geo.computeVertexNormals();
 }
 
 type Colors = Record<'paper' | 'sheet' | 'ink' | 'speck' | 'coverInner' | 'accent' | 'lineInk' | 'shadow' | 'shadowClear' | 'key' | 'rim' | 'sky' | 'ground', string>;
@@ -314,6 +318,8 @@ export async function createShowcaseScene(
   let insets: Insets = { top: 0, right: 0, bottom: 0, left: 0 };
   let zoom: Zoom = { scale: 1, x: 0, y: 0 };
   let api: ShowcaseApi;
+  /** read・show のたびに増やす。読み込み待ちの間に閉じた・切り替えた read の続きを捨てる */
+  let readToken = 0;
 
   const disposeBook = (b: ReadBook) => {
     b.disposed = true;
@@ -428,7 +434,7 @@ export async function createShowcaseScene(
         if (key === l.shaped) return;
         l.shaped = key;
         const o = leafOffsets(i, count);
-        updateShape(l.geo, l.p, o.offRight * k, o.offLeft * k, o.air * k, flutter, e);
+        updateShape(l.geo, l.p, o.offRight * k, o.offLeft * k, o.air * k, flutter, e, false);
       });
     }
 
@@ -503,9 +509,10 @@ export async function createShowcaseScene(
       insets = i;
       zoom = { scale: 1, x: 0, y: 0 };
       const start = Math.max(0, Math.min(startIndex, pages.length - 1));
+      const token = ++readToken;
       // 最初に見せる絵を読み込んでから差し替える（白い紙が一瞬見えないように）
       await loadImage(pages[start]!.src);
-      if (disposed) return;
+      if (disposed || token !== readToken) return;
       if (book) disposeBook(book);
       const group = new THREE.Group();
       const b: ReadBook = { group, pages, leaves: [], current: start, turning: null, disposed: false };
@@ -522,8 +529,18 @@ export async function createShowcaseScene(
       loadAround(b);
     },
     show() {
+      readToken++;
       mode = 'show';
       zoom = { scale: 1, x: 0, y: 0 };
+    },
+    jumpTo(index) {
+      const b = book;
+      if (!b || mode !== 'read') return;
+      const next = Math.max(0, Math.min(index, b.leaves.length - 1));
+      b.turning = null;
+      b.current = next;
+      b.leaves.forEach((l, i) => { l.p = i < next ? 1 : 0; });
+      loadAround(b);
     },
     turn(delta) {
       const b = book;

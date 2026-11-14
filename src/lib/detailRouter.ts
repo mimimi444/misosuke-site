@@ -15,6 +15,8 @@ function detailState(): DetailState | null {
 
 /** 新しい要求が来たら、古い読み込みの結果は捨てる（二重に開かない） */
 let seq = 0;
+/** 直接開いた詳細から積んだ履歴を ✕ で戻っている途中（戻った先も詳細なので、そこで一覧にして閉じる） */
+let closingToList = false;
 
 async function fetchDetail(pathAndSearch: string): Promise<DetailData | null> {
   try {
@@ -29,7 +31,8 @@ async function openFromLink(href: string, returnFocus: HTMLElement | null) {
   const n = ++seq;
   const data = await fetchDetail(href);
   if (n !== seq) return;
-  if (!data) { location.href = href; return; } // 読めなければ普通に移動する
+  // 読めない・ページが無ければ普通に移動する（URL だけ変わって詳細が開かない、を避ける）
+  if (!data || data.pages.length === 0) { location.href = href; return; }
   const open = isDetailOpen();
   const cur = detailState();
   const state: DetailState = open
@@ -40,8 +43,14 @@ async function openFromLink(href: string, returnFocus: HTMLElement | null) {
 }
 
 async function syncWithLocation() {
-  const target = parseDetailPath(location.pathname, location.search);
   const n = ++seq;
+  if (closingToList) {
+    closingToList = false;
+    history.replaceState(null, '', closeTarget(detailState()?.origin ?? null));
+    closeDetail();
+    return;
+  }
+  const target = parseDetailPath(location.pathname, location.search);
   if (!target) { closeDetail(); return; }
   const data = await fetchDetail(location.pathname + location.search);
   if (n !== seq) return;
@@ -73,8 +82,9 @@ export function initDetailRouter(): void {
     onCloseRequest() {
       const st = detailState();
       if (st && st.depth > 0) {
-        // 開いた元まで戻る（popstate で閉じる）
+        // 開いた元まで戻る（popstate で閉じる）。直接開いた詳細から積んだときは、戻った先も詳細なので印を付ける
         seq++;
+        closingToList = st.origin === null;
         history.go(-st.depth);
         return;
       }
