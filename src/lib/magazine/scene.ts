@@ -200,8 +200,8 @@ type Colors = Record<'paper' | 'sheet' | 'ink' | 'speck' | 'coverInner' | 'accen
 /** 読むモードの 1 枚の紙。絵は表示中のページの前後だけ読み込む */
 type ReadLeaf = {
   geo: THREE.BufferGeometry;
-  front: THREE.MeshBasicMaterial;
-  back: THREE.MeshBasicMaterial;
+  front: THREE.MeshStandardMaterial;
+  back: THREE.MeshStandardMaterial;
   tex: 'none' | 'loading' | 'done';
   p: number;
   /** 前回の形（同じなら頂点を計算し直さない） */
@@ -280,7 +280,34 @@ function imageTexture(img: HTMLImageElement): THREE.CanvasTexture {
 function disposeMaterial(m: THREE.Material, keep?: THREE.Texture) {
   const map = (m as THREE.MeshBasicMaterial).map;
   if (map && map !== keep) map.dispose();
+  glowMats.delete(m as THREE.MeshStandardMaterial);
   m.dispose();
+}
+
+/**
+ * 紙の材質。照明で陰影が付くのに加え、同じ絵を自ら光る色（emissive）としても持つ。
+ * 読むモードへ移るにつれ照明を弱め、自ら光る分を強めて、最後は照明の影響の無い本来の色にする（切り替えを滑らかに）。
+ */
+const glowMats = new Set<THREE.MeshStandardMaterial>();
+function paperMat(opts: { map?: THREE.Texture; color?: string; side: THREE.Side; transparent?: boolean; roughness?: number }): THREE.MeshStandardMaterial {
+  const m = new THREE.MeshStandardMaterial({
+    map: opts.map ?? null,
+    color: opts.map ? 0xffffff : opts.color,
+    emissive: opts.map ? 0xffffff : opts.color,
+    emissiveMap: opts.map ?? null,
+    emissiveIntensity: 0,
+    side: opts.side,
+    roughness: opts.roughness ?? 0.92,
+    transparent: opts.transparent ?? false,
+  });
+  glowMats.add(m);
+  return m;
+}
+
+/** 紙の材質の絵を差し替える（照明用と自ら光る用の両方） */
+function setPaperMap(m: THREE.MeshStandardMaterial, tex: THREE.Texture) {
+  m.map = m.emissiveMap = tex;
+  m.needsUpdate = true;
 }
 
 export async function createShowcaseScene(
@@ -305,7 +332,8 @@ export async function createShowcaseScene(
   const camera = new THREE.PerspectiveCamera(26, 1, 0.1, 60);
   camera.setFocalLength(FOCAL_MM);
 
-  scene.add(new THREE.HemisphereLight(colors.sky, colors.ground, 1.6));
+  const hemi = new THREE.HemisphereLight(colors.sky, colors.ground, 1.6);
+  scene.add(hemi);
   const key = new THREE.DirectionalLight(colors.key, 1.5);
   key.position.set(-2.5, 5, 2);
   scene.add(key);
@@ -349,8 +377,8 @@ export async function createShowcaseScene(
     const img = images[i] ?? null;
     // 表は絵、裏は同じ絵の透け（裏面に貼るので左右反転して見える）
     // 読むモードへ移るとき、左に寝ている紙を薄くして消すので透明を許す
-    const front = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: paperTexture(img, false, colors), side: THREE.FrontSide, roughness: 0.92, transparent: true }));
-    const back = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: paperTexture(img, true, colors), side: THREE.BackSide, roughness: 0.92, transparent: true }));
+    const front = new THREE.Mesh(geo, paperMat({ map: paperTexture(img, false, colors), side: THREE.FrontSide, transparent: true }));
+    const back = new THREE.Mesh(geo, paperMat({ map: paperTexture(img, true, colors), side: THREE.BackSide, transparent: true }));
     showGroup.add(front, back);
     showMaps.push({ front: front.material.map!, back: back.material.map! });
     showMeshes.push([front, back]);
@@ -359,10 +387,8 @@ export async function createShowcaseScene(
   });
 
   // 表紙: 内側は紙の色、外側（下になる面）だけオレンジ。読むモードでは照明の影響を受けない材質に替える
-  const coverInLit = new THREE.MeshStandardMaterial({ color: colors.coverInner, roughness: 0.85, side: THREE.DoubleSide });
-  const coverOutLit = new THREE.MeshStandardMaterial({ color: colors.accent, roughness: 0.7, side: THREE.DoubleSide });
-  const coverInFlat = new THREE.MeshBasicMaterial({ color: colors.coverInner, side: THREE.DoubleSide });
-  const coverOutFlat = new THREE.MeshBasicMaterial({ color: colors.accent, side: THREE.DoubleSide });
+  const coverInLit = paperMat({ color: colors.coverInner, roughness: 0.85, side: THREE.DoubleSide });
+  const coverOutLit = paperMat({ color: colors.accent, roughness: 0.7, side: THREE.DoubleSide });
   const coverMesh = (m: THREE.Material) => new THREE.Mesh<THREE.BufferGeometry, THREE.Material>(pageGeometry(), m);
   const coverR = coverMesh(coverInLit), coverL = coverMesh(coverInLit);
   const coverRo = coverMesh(coverOutLit), coverLo = coverMesh(coverOutLit);
@@ -541,15 +567,16 @@ export async function createShowcaseScene(
         l.tex = 'loading';
         void loadImage(b.pages[i]!.src).then((img) => {
           if (b.disposed || l.tex !== 'loading') return;
-          l.front.map = paperTexture(img, false, colors, READ_TEX_SCALE);
-          l.back.map = paperTexture(img, true, colors);
+          setPaperMap(l.front, paperTexture(img, false, colors, READ_TEX_SCALE));
+          setPaperMap(l.back, paperTexture(img, true, colors));
           l.front.needsUpdate = l.back.needsUpdate = true;
           l.tex = 'done';
         });
       } else if (dist > READ_WINDOW * 2 && l.tex !== 'none') {
         if (l.front.map !== blankRead) l.front.map?.dispose();
         if (l.back.map !== blankRead) l.back.map?.dispose();
-        l.front.map = l.back.map = blankRead;
+        setPaperMap(l.front, blankRead);
+        setPaperMap(l.back, blankRead);
         l.front.needsUpdate = l.back.needsUpdate = true;
         l.tex = 'none';
       }
@@ -600,8 +627,7 @@ export async function createShowcaseScene(
     guest.geo.dispose();
     guest.front.map?.dispose();
     guest.back.map?.dispose();
-    guest.front.dispose();
-    guest.back.dispose();
+    for (const m of [guest.front, guest.back]) { glowMats.delete(m); m.dispose(); }
     guest = null;
   };
   const updateGuest = (time: number, visible: boolean) => {
@@ -618,14 +644,13 @@ export async function createShowcaseScene(
   };
 
   /** 読むモードへ移るとき、見えていたページをめくる紙 */
-  let passing: { geo: THREE.BufferGeometry; group: THREE.Group; front: THREE.MeshBasicMaterial; back: THREE.MeshBasicMaterial; start: number } | null = null;
+  let passing: { geo: THREE.BufferGeometry; group: THREE.Group; front: THREE.MeshStandardMaterial; back: THREE.MeshStandardMaterial; start: number } | null = null;
   const endPassing = () => {
     if (!passing) return;
     passing.group.parent?.remove(passing.group);
     passing.geo.dispose();
     // テクスチャは見せる紙と共有しているので、材質だけ捨てる
-    passing.front.dispose();
-    passing.back.dispose();
+    for (const m of [passing.front, passing.back]) { glowMats.delete(m); m.dispose(); }
     passing = null;
   };
   /** 読む構図のカメラの距離と投影の中心のずれ（イーズアウトで追いかける） */
@@ -667,11 +692,11 @@ export async function createShowcaseScene(
       const opacity = reading ? 1 - e : 1;
       for (const m of pair) { m.visible = visible; m.material.opacity = opacity; }
     });
-    const flatMats = reading;
-    if ((coverR.material === coverInFlat) !== flatMats) {
-      coverR.material = coverL.material = flatMats ? coverInFlat : coverInLit;
-      coverRo.material = coverLo.material = flatMats ? coverOutFlat : coverOutLit;
-    }
+    // 照明を弱め、紙が自ら光る分を強める（e = 1 で照明の影響の無い本来の色）
+    hemi.intensity = 1.6 * (1 - e);
+    key.intensity = 1.5 * (1 - e);
+    rim.intensity = 0.6 * (1 - e);
+    for (const m of glowMats) m.emissiveIntensity = e;
     shapeCovers(e);
     const drift = motion ? 1 - e : 0;
 
@@ -832,8 +857,8 @@ export async function createShowcaseScene(
       const leafPages = isAlbum ? pages.slice(0, 1) : pages;
       b.leaves = leafPages.map((_, idx) => {
         const geo = pageGeometry();
-        const front = new THREE.MeshBasicMaterial({ map: blankRead, side: THREE.FrontSide });
-        const back = new THREE.MeshBasicMaterial({ map: blankRead, side: THREE.BackSide });
+        const front = paperMat({ map: blankRead, side: THREE.FrontSide });
+        const back = paperMat({ map: blankRead, side: THREE.BackSide });
         group.add(new THREE.Mesh(geo, front), new THREE.Mesh(geo, back));
         return { geo, front, back, tex: isAlbum ? ('done' as const) : ('none' as const), p: !isAlbum && idx < start ? 1 : 0, shaped: '' };
       });
@@ -845,8 +870,8 @@ export async function createShowcaseScene(
       if (fromShow) {
         const maps = showMaps[showRightLeaf];
         const geo = pageGeometry();
-        const front = new THREE.MeshBasicMaterial({ map: maps?.front ?? blankRead, side: THREE.FrontSide, transparent: true });
-        const back = new THREE.MeshBasicMaterial({ map: maps?.back ?? blankRead, side: THREE.BackSide, transparent: true });
+        const front = paperMat({ map: maps?.front ?? blankRead, side: THREE.FrontSide, transparent: true });
+        const back = paperMat({ map: maps?.back ?? blankRead, side: THREE.BackSide, transparent: true });
         const pg = new THREE.Group();
         pg.add(new THREE.Mesh(geo, front), new THREE.Mesh(geo, back));
         group.add(pg);
@@ -879,8 +904,8 @@ export async function createShowcaseScene(
       void loadImage(viewed.src).then((img) => {
         if (disposed || token !== guestToken || !img) return;
         const geo = pageGeometry();
-        const front = new THREE.MeshStandardMaterial({ map: paperTexture(img, false, colors), side: THREE.FrontSide, roughness: 0.92, transparent: true });
-        const back = new THREE.MeshStandardMaterial({ map: paperTexture(img, true, colors), side: THREE.BackSide, roughness: 0.92, transparent: true });
+        const front = paperMat({ map: paperTexture(img, false, colors), side: THREE.FrontSide, transparent: true });
+        const back = paperMat({ map: paperTexture(img, true, colors), side: THREE.BackSide, transparent: true });
         const group = new THREE.Group();
         group.add(new THREE.Mesh(geo, front), new THREE.Mesh(geo, back));
         magazine.add(group);
@@ -959,7 +984,7 @@ export async function createShowcaseScene(
         const mats = Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : [];
         mats.forEach((m) => disposeMaterial(m));
       });
-      [coverInLit, coverOutLit, coverInFlat, coverOutFlat].forEach((m) => m.dispose());
+      [coverInLit, coverOutLit].forEach((m) => disposeMaterial(m));
       blankRead.dispose();
       composer.dispose();
       renderer.dispose();
