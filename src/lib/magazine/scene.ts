@@ -26,6 +26,8 @@ const BASE_ROT = new THREE.Euler(0.06, 0.3, -0.05);
 /** 読むモードへの（からの）カメラの移動、1 枚めくる時間（秒） */
 const MOVE_SEC = 0.9;
 const TURN_SEC = 0.7;
+/** 見せるモードから読むモードへ移るとき、見えていたページをめくる時間（カメラの移動と同じ） */
+const PASS_SEC = MOVE_SEC;
 /** 読むモードで紙の周りに残す余白（紙の大きさに対する割合） */
 const READ_MARGIN = 0.04;
 /** 読むモードの紙の束の厚みは、この枚数分までに抑える */
@@ -292,6 +294,8 @@ export async function createShowcaseScene(
   magazine.add(showGroup);
   const leaves = buildLeaves(opts.pages);
   const images = await Promise.all(opts.pages.map((p) => loadImage(p.src)));
+  /** 見せる紙の表と裏のテクスチャ（読むモードへ移るとき、見えていたページをめくる紙に使う） */
+  const showMaps: { front: THREE.Texture; back: THREE.Texture }[] = [];
   const leafGeos = leaves.map((leaf, i) => {
     const geo = pageGeometry();
     const img = images[i] ?? null;
@@ -299,6 +303,7 @@ export async function createShowcaseScene(
     const front = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: paperTexture(img, false, colors), side: THREE.FrontSide, roughness: 0.92 }));
     const back = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: paperTexture(img, true, colors), side: THREE.BackSide, roughness: 0.92 }));
     showGroup.add(front, back);
+    showMaps.push({ front: front.material.map!, back: back.material.map! });
     return geo;
   });
 
@@ -467,6 +472,7 @@ export async function createShowcaseScene(
 
   const disposeBook = (b: ReadBook) => {
     b.disposed = true;
+    endPassing();
     if (b.gallery) disposeGallery(b.gallery);
     magazine.remove(b.group);
     for (const l of b.leaves) {
@@ -518,6 +524,19 @@ export async function createShowcaseScene(
   let raf = 0, disposed = false, lastState = '';
   const clock = new THREE.Clock();
   let prevTime = 0;
+  /** 見せるモードで右ページに見えている紙（leafGeos の番号。全部めくれていれば leafGeos.length） */
+  let showRightLeaf = 0;
+  /** 読むモードへ移るとき、見えていたページをめくる紙 */
+  let passing: { geo: THREE.BufferGeometry; group: THREE.Group; front: THREE.MeshBasicMaterial; back: THREE.MeshBasicMaterial; start: number } | null = null;
+  const endPassing = () => {
+    if (!passing) return;
+    passing.group.parent?.remove(passing.group);
+    passing.geo.dispose();
+    // テクスチャは見せる紙と共有しているので、材質だけ捨てる
+    passing.front.dispose();
+    passing.back.dispose();
+    passing = null;
+  };
   /** 読む構図のカメラの距離と投影の中心のずれ（イーズアウトで追いかける） */
   let fitSmooth: number | null = null;
   const offsetSmooth = { x: 0, y: 0 };
@@ -562,6 +581,7 @@ export async function createShowcaseScene(
       const local = time % cycleLength(n);
       const state: ShowcaseState['state'] = motion && local > forwardEnd(n) ? 'RIFFLE' : flipping ? 'TURNING' : 'HOLDING';
       const rightPageIndex = rightIndexOf(done, opts.pages.length);
+      showRightLeaf = done;
       const summary = `${state}|${done}`;
       if (summary !== lastState) {
         lastState = summary;
@@ -600,6 +620,14 @@ export async function createShowcaseScene(
     if (book?.gallery) {
       const k = Math.min(1, READ_STACK / Math.max(book.leaves.length, 1));
       updateGallery(book, book.gallery, time, e, leafOffsets(0, book.leaves.length).offRight * k);
+    }
+    if (book && passing) {
+      // 見えていたページが左へめくれ、その下から選んだ作品が現れる（カメラの移動と同時に）
+      const u = Math.min(1, (time - passing.start) / PASS_SEC);
+      const count = book.leaves.length, k = Math.min(1, READ_STACK / Math.max(count, 1));
+      const o = leafOffsets(0, count).offRight * k + 0.02;
+      updateShape(passing.geo, smooth(u), o, o, g * 4, 0.18 * Math.sin(Math.PI * u), e, false);
+      if (u >= 1) endPassing();
     }
 
     // 見せる構図
@@ -673,6 +701,9 @@ export async function createShowcaseScene(
       // 最初に見せる絵を読み込んでから差し替える（白い紙が一瞬見えないように）
       await loadImage(pages[start]!.src);
       if (disposed || token !== readToken) return;
+      // 見せるモードから移るときは、見えていたページを 1 枚のせて、めくって見せる
+      const fromShow = !book && motion && blend < 0.5;
+      endPassing();
       if (book) disposeBook(book);
       const group = new THREE.Group();
       const b: ReadBook = { group, pages, leaves: [], current: start, turning: null, disposed: false, gallery: null };
@@ -691,6 +722,16 @@ export async function createShowcaseScene(
         group.add(b.gallery.group);
       }
       magazine.add(group);
+      if (fromShow) {
+        const maps = showMaps[showRightLeaf];
+        const geo = pageGeometry();
+        const front = new THREE.MeshBasicMaterial({ map: maps?.front ?? blankRead, side: THREE.FrontSide });
+        const back = new THREE.MeshBasicMaterial({ map: maps?.back ?? blankRead, side: THREE.BackSide });
+        const pg = new THREE.Group();
+        pg.add(new THREE.Mesh(geo, front), new THREE.Mesh(geo, back));
+        group.add(pg);
+        passing = { geo, group: pg, front, back, start: clock.getElapsedTime() };
+      }
       book = b;
       mode = 'read';
       if (b.gallery) loadGalleryAround(b, b.gallery);
@@ -698,6 +739,7 @@ export async function createShowcaseScene(
     },
     show() {
       readToken++;
+      endPassing();
       mode = 'show';
       zoom = { scale: 1, x: 0, y: 0 };
     },
