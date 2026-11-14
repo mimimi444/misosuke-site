@@ -35,10 +35,13 @@ const READ_TEX_SCALE = 1.4;
 /** 読むモードで、表示中のページから前後この枚数までの絵を読み込んでおく */
 const READ_WINDOW = 2;
 
+/** 読むモードのページ。幅・高さが分かれば、絵の読み込み前から本来の縦横比で並べる */
+export type ReadPage = MagazinePage & { width?: number | null; height?: number | null };
+
 export type ShowcaseApi = {
   dispose(): void;
   /** 雑誌の中身を差し替え、カメラを正面へ移し、startIndex の絵を右ページに開く */
-  read(opts: { pages: MagazinePage[]; startIndex: number; insets: Insets }): Promise<void>;
+  read(opts: { pages: ReadPage[]; startIndex: number; insets: Insets }): Promise<void>;
   /** 「見せる」モードに戻す */
   show(): void;
   /** 読むモードで 1 枚めくる */
@@ -161,56 +164,70 @@ type ReadLeaf = {
 
 type ReadBook = {
   group: THREE.Group;
-  pages: MagazinePage[];
+  pages: ReadPage[];
   leaves: ReadLeaf[];
   /** 右ページに開いている絵 */
   current: number;
   turning: { leaf: number; from: number; to: number; start: number; next: number } | null;
   disposed: boolean;
-  /** アルバムの 2 ページ目以降が並ぶ帯（1 枚ものは null） */
-  strip: Strip | null;
+  /** アルバム（2 ページ以上）の絵の列。1 枚ものは null */
+  gallery: Gallery | null;
 };
 
 /**
- * アルバムの 2 ページ目以降の絵（本来の縦横比）。紙の下から右へ滑り出して一列に並び、そのまま左へ流れる。
- * 先頭は紙の下へ潜り、右の端から出直す。右は画面の端で見切れる。
+ * アルバムの絵の列。どのページも本来の縦横比の絵そのもので、紙面の絵の枠に収まる大きさで横一列に並ぶ。
+ * 中央（右ページの絵の枠）にあるのが表示中のページで、ほかは白く薄く覆う。
+ * 開いて少ししてから、ほかのページが表示中の絵の下から横へ滑り出す。ページを送ると列ごと横へずれる。
  */
-type Strip = {
+type GalleryItem = {
+  mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
+  veil: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
+  w: number;
+  /** 列の中での中心の位置 */
+  c: number;
+  src: string;
+  tex: 'none' | 'loading' | 'done';
+};
+type Gallery = {
   group: THREE.Group;
-  items: { mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>; w: number; u: number }[];
-  textures: THREE.Texture[];
-  /** 一列の長さ（隙間を含む） */
-  length: number;
-  /** 滑り出しを始めた時刻（カメラが正面に来てから） */
-  start: number | null;
+  items: GalleryItem[];
+  /** 滑り出しを始める時刻と、そのとき表示していたページ */
+  introStart: number;
+  introIndex: number;
+  /** 列の位置の動き（c の値）。ページを送るとき from から to へ */
+  from: number;
+  to: number;
+  moveStart: number;
 };
 
-/** 帯の絵の高さ（紙面の絵の枠の高さに対する割合）、隙間、流れる速さ（単位/秒） */
-const STRIP_SCALE = 0.82;
-const STRIP_GAP = 0.14;
-const STRIP_SPEED = 0.16;
-/** 帯の右端をどこまで埋めるか（紙の右端からの距離。画面の外まで届かせて見切れさせる） */
-const STRIP_SPAN = 7;
-/** 1 枚ずつずらして滑り出す間隔と、滑り出しにかける時間（秒） */
-const STRIP_STAGGER = 0.12;
-const STRIP_SLIDE_SEC = 1.1;
-/** 帯に使う絵の枚数の上限と、テクスチャの長辺（px） */
-const STRIP_MAX_PAGES = 10;
-const STRIP_TEX_PX = 720;
-/** 紙面の絵の枠（paperTexture の余白と同じ割合）。帯の絵の中心を紙面の絵の中心に揃える */
+/** 開いてから滑り出すまで（秒）、滑り出しの長さ、1 枚ずつずらす間隔、ページを送るときの長さ */
+const GALLERY_DELAY = 0.3;
+const GALLERY_INTRO_SEC = 1.1 / 1.5;
+const GALLERY_STAGGER = 0.08;
+const GALLERY_SLIDE_SEC = 0.55;
+/** 絵と絵の隙間、表示中以外を覆う白の濃さ */
+const GALLERY_GAP = 0.12;
+const GALLERY_VEIL = 0.8;
+/** 表示中のページから前後この枚数の絵を読み込み、離れたら手放す */
+const GALLERY_WINDOW = 3;
+const GALLERY_TEX_PX = 1600;
+/** 紙面の絵の枠（paperTexture の余白と同じ割合） */
+const IMAGE_BOX_W = (900 - 70 * 2) / 900;
 const IMAGE_BOX_H = (1200 - 70 * 2 - 90) / 1200;
 const IMAGE_BOX_CENTER = (70 + (1200 - 70 * 2 - 90) / 2) / 1200 - 0.5;
 
-/** 帯用に縮めた絵のテクスチャ */
-function stripTexture(img: HTMLImageElement): THREE.CanvasTexture {
-  const k = Math.min(1, STRIP_TEX_PX / Math.max(img.naturalWidth, img.naturalHeight));
+const easeOut = (x: number) => 1 - Math.pow(1 - Math.min(1, Math.max(0, x)), 3);
+
+/** 絵のテクスチャ（長辺を抑える） */
+function imageTexture(img: HTMLImageElement): THREE.CanvasTexture {
+  const k = Math.min(1, GALLERY_TEX_PX / Math.max(img.naturalWidth, img.naturalHeight));
   const c = document.createElement('canvas');
   c.width = Math.max(1, Math.round(img.naturalWidth * k));
   c.height = Math.max(1, Math.round(img.naturalHeight * k));
   c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 4;
+  t.anisotropy = 8;
   return t;
 }
 
@@ -366,67 +383,91 @@ export async function createShowcaseScene(
   /** read・show のたびに増やす。読み込み待ちの間に閉じた・切り替えた read の続きを捨てる */
   let readToken = 0;
 
-  const disposeStrip = (strip: Strip) => {
-    strip.items.forEach((it) => { it.mesh.geometry.dispose(); it.mesh.material.dispose(); });
-    strip.textures.forEach((t) => t.dispose());
+  const disposeGallery = (g: Gallery) => {
+    g.items.forEach((it) => {
+      it.mesh.material.map?.dispose();
+      it.mesh.geometry.dispose();
+      it.mesh.material.dispose();
+      it.veil.geometry.dispose();
+      it.veil.material.dispose();
+    });
   };
 
-  /** アルバムの 2 ページ目以降を読み込み、紙の下に帯を用意する（滑り出しは frame で） */
-  const buildStrip = async (b: ReadBook) => {
-    const rest = b.pages.slice(1, 1 + STRIP_MAX_PAGES);
-    if (rest.length === 0) return;
-    const imgs = (await Promise.all(rest.map((p) => loadImage(p.src)))).filter((i): i is HTMLImageElement => !!i);
-    if (b.disposed || imgs.length === 0) return;
-    const textures = imgs.map(stripTexture);
-    const h = PAPER.height * IMAGE_BOX_H * STRIP_SCALE;
+  /** アルバムの絵の列を作る。絵の大きさは紙面の絵の枠に収まる大きさ（縦横比はデータの幅・高さから） */
+  const buildGallery = (pages: ReadPage[], start: number, time: number): Gallery => {
+    const boxW = PAPER.width * IMAGE_BOX_W, boxH = PAPER.height * IMAGE_BOX_H;
     const group = new THREE.Group();
-    // 紙（表紙の外側）より下に置き、紙の下に潜ったときは紙に隠れる
-    group.position.set(0, -0.03, PAPER.height * IMAGE_BOX_CENTER);
-    const items: Strip['items'] = [];
-    let u = 0;
-    // 画面の外まで届くまで、同じ並びを繰り返す
-    for (let k = 0; u < STRIP_SPAN || k % textures.length !== 0; k++) {
-      const tex = textures[k % textures.length]!;
-      const img = tex.image as HTMLCanvasElement;
-      const w = h * (img.width / img.height);
-      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0 });
-      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
-      mesh.rotation.x = -Math.PI / 2; // 紙と同じく上を向けて寝かせる
-      group.add(mesh);
-      items.push({ mesh, w, u });
-      u += w + STRIP_GAP;
-      if (k > 200) break;
-    }
-    b.group.add(group);
-    b.strip = { group, items, textures, length: u, start: null };
+    group.position.z = PAPER.height * IMAGE_BOX_CENTER;
+    const items: GalleryItem[] = [];
+    let c = 0;
+    pages.forEach((p, i) => {
+      const aspect = p.width && p.height ? p.width / p.height : 3 / 4;
+      const scale = Math.min(boxW / aspect, boxH);
+      const w = scale * aspect, h = scale;
+      if (i > 0) c += items[i - 1]!.w / 2 + GALLERY_GAP + w / 2;
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: colors.sheet, transparent: true, opacity: 0 }));
+      const veil = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: colors.sheet, transparent: true, opacity: 0, depthWrite: false }));
+      mesh.rotation.x = veil.rotation.x = -Math.PI / 2; // 紙と同じく上を向けて寝かせる
+      group.add(mesh, veil);
+      items.push({ mesh, veil, w, c, src: p.src, tex: 'none' });
+    });
+    const at = items[start]!.c;
+    return { group, items, introStart: time + GALLERY_DELAY, introIndex: start, from: at, to: at, moveStart: time };
   };
 
-  /** 帯の位置と濃さ。e は読むモードへの進み */
-  const updateStrip = (strip: Strip, time: number, e: number) => {
-    const W = PAPER.width;
-    if (strip.start === null && e >= 1) strip.start = time;
-    const t = strip.start === null ? -1 : time - strip.start;
-    const slideEnd = STRIP_SLIDE_SEC + STRIP_STAGGER * Math.min(strip.items.length, 8);
-    const offset = motion && t > slideEnd ? (t - slideEnd) * STRIP_SPEED : 0;
-    // 拡大中は帯を消して絵だけにする
-    const opacity = zoom.scale > 1.001 ? 0 : e;
-    strip.items.forEach((it, i) => {
-      // 流れているときの左端の位置。紙の下に完全に潜ったら、一列の長さだけ右へ出直す
-      let x = W + STRIP_GAP + it.u - offset;
-      if (x + it.w < W - 0.02) x += strip.length * Math.ceil((W - 0.02 - x - it.w) / strip.length);
-      // 滑り出し: 右ページの真下から、1 枚ずつずらして所定の位置へ
-      const hidden = W / 2 - it.w / 2;
-      const sIn = !motion ? (strip.start === null ? 0 : 1) : t < 0 ? 0 : smooth(Math.min(1, Math.max(0, (t - i * STRIP_STAGGER) / STRIP_SLIDE_SEC)));
-      const left = hidden + (x - hidden) * sIn;
-      it.mesh.position.set(left + it.w / 2, 0, 0);
+  /** 表示中のページの前後の絵を読み込み、遠い絵は手放す */
+  const loadGalleryAround = (b: ReadBook, g: Gallery) => {
+    g.items.forEach((it, i) => {
+      const dist = Math.abs(i - b.current);
+      if (dist <= GALLERY_WINDOW && it.tex === 'none') {
+        it.tex = 'loading';
+        void loadImage(it.src).then((img) => {
+          if (b.disposed || it.tex !== 'loading') return;
+          if (!img) { it.tex = 'none'; return; }
+          it.mesh.material.map = imageTexture(img);
+          it.mesh.material.color.set(0xffffff);
+          it.mesh.material.needsUpdate = true;
+          it.tex = 'done';
+        });
+      } else if (dist > GALLERY_WINDOW * 2 && it.tex === 'done') {
+        it.mesh.material.map?.dispose();
+        it.mesh.material.map = null;
+        it.mesh.material.color.set(colors.sheet);
+        it.mesh.material.needsUpdate = true;
+        it.tex = 'none';
+      }
+    });
+  };
+
+  /** 列の位置・重なり・白い覆い。e は読むモードへの進み、top は紙の上面の高さ */
+  const updateGallery = (b: ReadBook, g: Gallery, time: number, e: number, top: number) => {
+    const centerX = PAPER.width / 2;
+    const u = motion ? (time - g.moveStart) / GALLERY_SLIDE_SEC : 1;
+    const pos = g.from + (g.to - g.from) * easeOut(u);
+    const zoomed = zoom.scale > 1.001;
+    g.items.forEach((it, i) => {
+      const target = centerX + (it.c - pos);
+      // 滑り出し: 開いたときに表示していた絵の下から、近い順に少しずつずらして横へ
+      const k = Math.abs(i - g.introIndex);
+      const p = !motion || k === 0 ? 1 : easeOut((time - g.introStart - (k - 1) * GALLERY_STAGGER) / GALLERY_INTRO_SEC);
+      const x = centerX + (target - centerX) * p;
+      const slot = it.w + GALLERY_GAP;
+      const d = Math.abs(x - centerX) / slot;
+      // 中央に近いほど上に重ねる（下から滑り出して見えるように）。同じ位置なら開いたときの絵に近い順
+      const y = top + 0.004 + 0.004 / (1 + d) - 0.0003 * k;
+      it.mesh.position.set(x, y, 0);
+      it.veil.position.set(x, y + 0.0001, 0);
+      const opacity = zoomed && i !== b.current ? 0 : e;
       it.mesh.material.opacity = opacity;
       it.mesh.visible = opacity > 0.001;
+      it.veil.material.opacity = opacity * GALLERY_VEIL * Math.min(1, d * 2);
+      it.veil.visible = it.veil.material.opacity > 0.001;
     });
   };
 
   const disposeBook = (b: ReadBook) => {
     b.disposed = true;
-    if (b.strip) disposeStrip(b.strip);
+    if (b.gallery) disposeGallery(b.gallery);
     magazine.remove(b.group);
     for (const l of b.leaves) {
       l.geo.dispose();
@@ -477,6 +518,9 @@ export async function createShowcaseScene(
   let raf = 0, disposed = false, lastState = '';
   const clock = new THREE.Clock();
   let prevTime = 0;
+  /** 読む構図のカメラの距離と投影の中心のずれ（イーズアウトで追いかける） */
+  let fitSmooth: number | null = null;
+  const offsetSmooth = { x: 0, y: 0 };
 
   const frame = () => {
     if (disposed) return;
@@ -553,7 +597,10 @@ export async function createShowcaseScene(
     ground.scale.setScalar(1 - magazine.position.y * 0.6);
     magazine.updateMatrixWorld();
 
-    if (book?.strip) updateStrip(book.strip, time, e);
+    if (book?.gallery) {
+      const k = Math.min(1, READ_STACK / Math.max(book.leaves.length, 1));
+      updateGallery(book, book.gallery, time, e, leafOffsets(0, book.leaves.length).offRight * k);
+    }
 
     // 見せる構図
     centroid.set(0, 0, 0);
@@ -566,7 +613,8 @@ export async function createShowcaseScene(
     if (book && e > 0) {
       // 読む構図: 右ページの真上（紙面の法線方向）から、パネルを除いた領域に収まる距離で見る
       const count = book.leaves.length, k = Math.min(1, READ_STACK / Math.max(count, 1));
-      const top = book.current < count ? leafOffsets(book.current, count).offRight * k : g * 0.5;
+      const topIndex = book.gallery ? 0 : book.current;
+      const top = topIndex < count ? leafOffsets(topIndex, count).offRight * k : g * 0.5;
       const q = magazine.quaternion;
       readNormal.set(0, 1, 0).applyQuaternion(q);
       readUp.set(0, 0, -1).applyQuaternion(q); // 紙の上端（テクスチャの上）が画面の上
@@ -575,7 +623,10 @@ export async function createShowcaseScene(
       const fit = fitDistance({
         pageW: PAPER.width, pageH: PAPER.height, fovV, aspect: camera.aspect, viewW, viewH, insets, margin: READ_MARGIN,
       });
-      const dist = fit / zoom.scale;
+      // パネルの大きさが変わったときなどの距離・中心のずれの変化は、急に跳ばずにイーズアウトで移る
+      const follow = motion && fitSmooth !== null ? 1 - Math.exp(-dt * 7) : 1;
+      fitSmooth = fitSmooth === null ? fit : fitSmooth + (fit - fitSmooth) * follow;
+      const dist = fitSmooth / zoom.scale;
       // ズームの移動量（画面の px）を、紙面上の距離に直す。絵が右へ動く＝カメラは左へ
       const perPx = (2 * Math.tan(fovV / 2) * dist) / viewH;
       readTarget.set(PAPER.width / 2, top, 0).applyMatrix4(magazine.matrixWorld)
@@ -588,8 +639,11 @@ export async function createShowcaseScene(
       camera.up.lerpVectors(WORLD_UP, readUp, e).normalize();
       // 投影の中心を、パネルを除いた領域の中央へずらす
       const dx = (insets.left - insets.right) / 2, dy = (insets.top - insets.bottom) / 2;
-      camera.setViewOffset(viewW, viewH, -dx * e, -dy * e, viewW, viewH);
+      offsetSmooth.x += (dx - offsetSmooth.x) * follow;
+      offsetSmooth.y += (dy - offsetSmooth.y) * follow;
+      camera.setViewOffset(viewW, viewH, -offsetSmooth.x * e, -offsetSmooth.y * e, viewW, viewH);
     } else {
+      fitSmooth = null;
       camera.position.copy(showPos);
       lookTarget.copy(smoothed);
       camera.up.copy(WORLD_UP);
@@ -621,19 +675,26 @@ export async function createShowcaseScene(
       if (disposed || token !== readToken) return;
       if (book) disposeBook(book);
       const group = new THREE.Group();
-      const b: ReadBook = { group, pages, leaves: [], current: start, turning: null, disposed: false, strip: null };
-      b.leaves = pages.map((_, idx) => {
+      const b: ReadBook = { group, pages, leaves: [], current: start, turning: null, disposed: false, gallery: null };
+      // アルバムは無地の紙 1 枚の上に絵の列を置く（ページは紙をめくらず、列を横へずらして送る）。1 枚ものは紙に絵を描く
+      const isAlbum = pages.length >= 2;
+      const leafPages = isAlbum ? pages.slice(0, 1) : pages;
+      b.leaves = leafPages.map((_, idx) => {
         const geo = pageGeometry();
         const front = new THREE.MeshBasicMaterial({ map: blankRead, side: THREE.FrontSide });
         const back = new THREE.MeshBasicMaterial({ map: blankRead, side: THREE.BackSide });
         group.add(new THREE.Mesh(geo, front), new THREE.Mesh(geo, back));
-        return { geo, front, back, tex: 'none' as const, p: idx < start ? 1 : 0, shaped: '' };
+        return { geo, front, back, tex: isAlbum ? ('done' as const) : ('none' as const), p: !isAlbum && idx < start ? 1 : 0, shaped: '' };
       });
+      if (isAlbum) {
+        b.gallery = buildGallery(pages, start, clock.getElapsedTime());
+        group.add(b.gallery.group);
+      }
       magazine.add(group);
       book = b;
       mode = 'read';
-      loadAround(b);
-      void buildStrip(b);
+      if (b.gallery) loadGalleryAround(b, b.gallery);
+      else loadAround(b);
     },
     show() {
       readToken++;
@@ -643,6 +704,13 @@ export async function createShowcaseScene(
     jumpTo(index) {
       const b = book;
       if (!b || mode !== 'read') return;
+      if (b.gallery) {
+        const g = b.gallery;
+        b.current = Math.max(0, Math.min(index, g.items.length - 1));
+        g.from = g.to = g.items[b.current]!.c;
+        loadGalleryAround(b, g);
+        return;
+      }
       const next = Math.max(0, Math.min(index, b.leaves.length - 1));
       b.turning = null;
       b.current = next;
@@ -652,6 +720,21 @@ export async function createShowcaseScene(
     turn(delta) {
       const b = book;
       if (!b || mode !== 'read') return;
+      if (b.gallery) {
+        // アルバム: 列を横へずらし、次（前）の絵を表示中の位置へ滑り込ませる
+        const g = b.gallery;
+        const next = nextPageIndex(b.current, delta, g.items.length);
+        if (next === b.current) return;
+        const now = clock.getElapsedTime();
+        const u = motion ? (now - g.moveStart) / GALLERY_SLIDE_SEC : 1;
+        g.from = g.from + (g.to - g.from) * easeOut(u); // 動いている途中からでも滑らかに続ける
+        g.to = g.items[next]!.c;
+        g.moveStart = now;
+        b.current = next;
+        zoom = { scale: 1, x: 0, y: 0 };
+        loadGalleryAround(b, g);
+        return;
+      }
       finishTurn(b);
       const next = nextPageIndex(b.current, delta, b.leaves.length);
       if (next === b.current) return;
