@@ -2,6 +2,8 @@
 // トップとタグページで共通の構成: 左（スマホは上）に流れる作品一覧、残りに空中の雑誌。
 import Rail from './Rail.astro';
 import Showcase from './Showcase.astro';
+import DetailPanel from './DetailPanel.astro';
+import type { DetailData } from '../lib/detail';
 import type { RailItem } from '../lib/rail';
 import type { Showcase as ShowcaseData, ShowcaseCandidates } from '../lib/showcase';
 
@@ -13,8 +15,10 @@ interface Props {
   /** タグページの見出し（例: #春） */
   heading?: string;
   tag?: string;
+  /** 作品詳細を開いた状態で返すとき */
+  detail?: DetailData | null;
 }
-const { items, nextCursor, candidates, fallback, heading, tag } = Astro.props;
+const { items, nextCursor, candidates, fallback, heading, tag, detail = null } = Astro.props;
 ---
 
 <div class="home">
@@ -22,6 +26,7 @@ const { items, nextCursor, candidates, fallback, heading, tag } = Astro.props;
   <div class="home-stage">
     {heading && <h1 class="home-heading panel"><span class="hud-label">TAG</span> {heading}</h1>}
     <Showcase candidates={candidates} fallback={fallback} />
+    <DetailPanel detail={detail} />
   </div>
 </div>
 
@@ -37,6 +42,7 @@ const { items, nextCursor, candidates, fallback, heading, tag } = Astro.props;
   .home > .rail { border-right: 1px solid var(--line); }
   .home-stage { position: relative; display: grid; min-height: 0; min-width: 0; }
   .home-stage > .showcase { grid-area: 1 / 1; }
+  .home-stage { isolation: isolate; }
   .home-heading {
     grid-area: 1 / 1;
     align-self: start;

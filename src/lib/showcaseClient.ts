@@ -2,6 +2,7 @@
 import { pickShowcase, type Showcase, type ShowcaseCandidates } from './showcase';
 import { railHref } from './links';
 import { workPath } from './workMeta';
+import { setStage } from './stage';
 
 /** 開いている見開きの右ページの作品へのリンク */
 function hrefFor(show: Showcase, pageIndex: number): string {
@@ -14,15 +15,15 @@ async function setup(root: HTMLElement) {
   const json = root.querySelector<HTMLScriptElement>('[data-role="candidates"]');
   const canvas = root.querySelector<HTMLCanvasElement>('.showcase-canvas');
   const hit = root.querySelector<HTMLAnchorElement>('.showcase-hit');
-  if (!json || !canvas || !hit) return;
+  if (!json || !canvas || !hit) return setStage(null);
 
   // 3D が使えなければ、HTML の固定内容（平面の見開き）のまま。選び直すと表示とリンクが食い違うため先に確かめる
   const { canUseWebGL, createShowcaseScene } = await import('./magazine/scene');
-  if (!canUseWebGL()) return;
+  if (!canUseWebGL()) return setStage(null);
 
   const candidates = JSON.parse(json.textContent || '{}') as ShowcaseCandidates;
   const show = pickShowcase(candidates, Math.random);
-  if (!show) return;
+  if (!show) return setStage(null);
 
   const set = (role: string, text: string) => {
     const el = root.querySelector(`[data-role="${role}"]`);
@@ -45,14 +46,16 @@ async function setup(root: HTMLElement) {
       },
     });
     root.dataset.mode = '3d';
-    // 開発中だけ、開発者ツールから読むモードを試せるようにする（Task 5 で詳細に組み込むまで）
-    if (import.meta.env.DEV) (window as unknown as { __showcase?: typeof api }).__showcase = api;
+    setStage(api);
   } catch (e) {
     console.error('3D の雑誌を表示できなかったので平面表示にする', e);
     canvas.hidden = true;
+    setStage(null);
   }
 }
 
 export function initShowcases() {
-  document.querySelectorAll<HTMLElement>('.showcase').forEach((root) => void setup(root));
+  const roots = document.querySelectorAll<HTMLElement>('.showcase');
+  if (roots.length === 0) setStage(null);
+  roots.forEach((root) => void setup(root));
 }
