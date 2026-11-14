@@ -45,6 +45,9 @@ const PASS_FADE_SEC = 0.6;
 /** 手でめくる 1 枚の時間と、めくった後に自動めくりを止めておく時間（秒） */
 const MANUAL_TURN_SEC = 0.6;
 const MANUAL_HOLD_SEC = 4;
+/** 閉じた雑誌の表紙を開く時間と、開いた後に最初のページを見せておく時間（秒） */
+const OPEN_SEC = 1.4;
+const OPEN_HOLD_SEC = 1.5;
 /** 詳細から戻ったときにのせた紙を見せておく時間と、めくる時間、めくった後に消える時間（秒） */
 const GUEST_HOLD_SEC = 2.5;
 const GUEST_FLIP_SEC = 1.6;
@@ -67,6 +70,8 @@ export type ShowcaseApi = {
   read(opts: { pages: ReadPage[]; startIndex: number; insets: Insets }): Promise<void>;
   /** 「見せる」モードに戻す */
   show(viewed?: ViewedPage): void;
+  /** 閉じた状態で始めた雑誌を開く（準備ができたら呼ぶ） */
+  open(): void;
   /** 見せるモードで手で 1 枚めくる（スワイプ）。1 = 次、-1 = 前 */
   flip(delta: 1 | -1): void;
   /** 読むモードで 1 枚めくる */
@@ -312,7 +317,15 @@ function setPaperMap(m: THREE.MeshStandardMaterial, tex: THREE.Texture) {
 
 export async function createShowcaseScene(
   canvas: HTMLCanvasElement,
-  opts: { pages: (MagazinePage & { free?: FreePageView })[]; reducedMotion: boolean; onState?: (s: ShowcaseState) => void },
+  opts: {
+    pages: (MagazinePage & { free?: FreePageView })[];
+    reducedMotion: boolean;
+    onState?: (s: ShowcaseState) => void;
+    /** 準備の進み（0〜1）。絵の読み込みと最初の描画 */
+    onProgress?: (ratio: number) => void;
+    /** 表紙を閉じた状態で始め、open() で開く */
+    startClosed?: boolean;
+  },
 ): Promise<ShowcaseApi> {
   const colors: Colors = {
     paper: cssVar('--paper'), sheet: cssVar('--sheet'), ink: cssVar('--sheet-ink'), speck: cssVar('--sheet-speck'),
@@ -366,7 +379,14 @@ export async function createShowcaseScene(
   magazine.add(showGroup);
   const leaves = buildLeaves(opts.pages);
   // フリーページは、管理画面のプレビューと同じ描き方で紙に描く
-  const images = await Promise.all(opts.pages.map((p) => (p.free ? renderFreePage(p.free) : loadImage(p.src))));
+  // 準備の進み: 絵を 1 枚読み込むごとに進め、最初の描画で 100%
+  let loadedCount = 0;
+  const steps = opts.pages.length + 1;
+  opts.onProgress?.(0);
+  const images = await Promise.all(opts.pages.map((p) => {
+    const job: Promise<HTMLImageElement | HTMLCanvasElement | null> = p.free ? renderFreePage(p.free) : loadImage(p.src);
+    return job.then((img) => { opts.onProgress?.(++loadedCount / steps); return img; });
+  }));
   /** 見せる紙の表と裏のテクスチャ（読むモードへ移るとき、見えていたページをめくる紙に使う） */
   const showMaps: { front: THREE.Texture; back: THREE.Texture }[] = [];
   /** 見せる紙のメッシュ（表・裏）と、最後に計算しためくりの進み */
@@ -390,18 +410,29 @@ export async function createShowcaseScene(
   const coverInLit = paperMat({ color: colors.coverInner, roughness: 0.85, side: THREE.DoubleSide });
   const coverOutLit = paperMat({ color: colors.accent, roughness: 0.7, side: THREE.DoubleSide });
   const coverMesh = (m: THREE.Material) => new THREE.Mesh<THREE.BufferGeometry, THREE.Material>(pageGeometry(), m);
-  const coverR = coverMesh(coverInLit), coverL = coverMesh(coverInLit);
-  const coverRo = coverMesh(coverOutLit), coverLo = coverMesh(coverOutLit);
+  const coverR = coverMesh(coverInLit);
+  const coverRo = coverMesh(coverOutLit);
+  // 左の表紙（おもて表紙）は 1 枚の紙として、表（右に寝ているとき上）がオレンジ、裏（開いて左に寝たとき上）が内側の色。
+  // 閉じた雑誌から開くときは、この表紙をめくる
+  const coverInBack = paperMat({ color: colors.coverInner, roughness: 0.85, side: THREE.BackSide });
+  const coverOutFront = paperMat({ color: colors.accent, roughness: 0.7, side: THREE.FrontSide });
+  const frontCoverGeo = pageGeometry();
+  const coverL = new THREE.Mesh<THREE.BufferGeometry, THREE.Material>(frontCoverGeo, coverInBack);
+  const coverLo = new THREE.Mesh<THREE.BufferGeometry, THREE.Material>(frontCoverGeo, coverOutFront);
   magazine.add(coverR, coverL, coverRo, coverLo);
   const g = PAPER.gap;
-  let coverFlatten = -1;
+  /** 表紙の開き具合（0 = 閉じて右の束の上、1 = 開いて左） */
+  let openP = opts.startClosed && !opts.reducedMotion ? 0 : 1;
+  let openStart: number | null = null;
+  const closedTop = leafOffsets(0, leaves.length).offRight + g;
+  let coverKey = '';
   const shapeCovers = (flatten: number) => {
-    if (flatten === coverFlatten) return;
-    coverFlatten = flatten;
+    const key = `${flatten}|${openP}`;
+    if (key === coverKey) return;
+    coverKey = key;
     updateShape(coverR.geometry, 0, g * 0.5, 0, 0, 0, flatten);
-    updateShape(coverL.geometry, 1, 0, g * 0.5, 0, 0, flatten);
     updateShape(coverRo.geometry, 0, -g * 0.6, 0, 0, 0, flatten);
-    updateShape(coverLo.geometry, 1, 0, -g * 0.6, 0, 0, flatten);
+    updateShape(frontCoverGeo, openP, closedTop, g * 0.5, g * 4, 0.15 * Math.sin(Math.PI * openP), flatten);
   };
   shapeCovers(0);
 
@@ -640,10 +671,12 @@ export async function createShowcaseScene(
   let raf = 0, disposed = false, lastState = '';
   const clock = new THREE.Clock();
   let prevTime = 0;
+  let cameraReady = false;
   /** 見せるモードの時間割の時刻（手でめくると実際の時刻からずれる） */
   let showT = 0;
   let manual: { target: number; rate: number } | null = null;
-  let holdUntil = 0;
+  /** この時刻までは自動でめくらない（閉じた状態で始めたときは、開くまで止めておく） */
+  let holdUntil = opts.startClosed && !opts.reducedMotion ? Infinity : 0;
   /** 見せるモードで右ページに見えている紙（leafGeos の番号。全部めくれていれば leafGeos.length） */
   let showRightLeaf = 0;
   let showFlipping = 0, showDone = 0;
@@ -712,6 +745,9 @@ export async function createShowcaseScene(
         holdUntil = time + MANUAL_HOLD_SEC;
       } else showT += Math.sign(manual.target - showT) * step;
     } else if (motion && time >= holdUntil && !book) showT += dt;
+
+    // 閉じた雑誌を開く
+    if (openStart !== null && openP < 1) openP = smooth(Math.min(1, (time - openStart) / OPEN_SEC));
 
     // 見せる ⇄ 読む の進み
     const goal = mode === 'read' ? 1 : 0;
@@ -822,7 +858,9 @@ export async function createShowcaseScene(
     centroid.set(0, 0, 0);
     for (let k = 0; k < coverPos.count; k++) centroid.add(tmp.set(coverPos.getX(k), coverPos.getY(k), coverPos.getZ(k)));
     centroid.divideScalar(coverPos.count).applyMatrix4(magazine.matrixWorld);
-    smoothed.lerp(centroid, motion ? 0.05 : 1);
+    // 最初のコマはカメラを正しい位置に置く（決まった初期値から滑って寄って来ると、一瞬拡大して見える）
+    if (!cameraReady) { smoothed.copy(centroid); cameraReady = true; }
+    else smoothed.lerp(centroid, motion ? 0.05 : 1);
     showPos.copy(smoothed).add(VIEW_OFFSET);
     if (motion) { showPos.x += Math.sin(time * 0.31) * 0.01 * drift; showPos.y += Math.sin(time * 0.23) * 0.008 * drift; }
 
@@ -881,6 +919,9 @@ export async function createShowcaseScene(
 
   api = {
     async read({ pages, startIndex, insets: i }) {
+      // 閉じたまま詳細を開いたら（URL を直接開いたとき）、表紙は開いた状態にする
+      openP = 1;
+      openStart = null;
       if (pages.length === 0) return;
       insets = i;
       zoom = { scale: 1, x: 0, y: 0 };
@@ -968,6 +1009,12 @@ export async function createShowcaseScene(
         lastState = '';
       });
     },
+    open() {
+      if (openP >= 1 || openStart !== null) return;
+      const now = clock.getElapsedTime();
+      openStart = now;
+      holdUntil = now + OPEN_SEC + OPEN_HOLD_SEC;
+    },
     flip(delta) {
       if (book || leafGeos.length === 0) return;
       const m = manualTurn(manual ? manual.target : showT, flips, delta);
@@ -1046,5 +1093,6 @@ export async function createShowcaseScene(
     },
   };
   frame();
+  opts.onProgress?.(1);
   return api;
 }

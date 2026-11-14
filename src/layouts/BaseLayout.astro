@@ -16,6 +16,8 @@ const loggedIn = await isLoggedIn(Astro.cookies);
 <html lang="ja">
   <head>
     <meta charset="UTF-8" />
+    <!-- JavaScript が動く環境だけ、トップの雑誌の読み込み画面を出す（.js） -->
+    <script is:inline>document.documentElement.classList.add('js');</script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex, nofollow" />
     {description && <meta name="description" content={description} />}

@@ -31,6 +31,15 @@ const fallbackHref = first?.href ?? '#';
       </div>
       <p class="showcase-hud showcase-turn hud-label" data-role="turn">AUTO TURN ・ 01 / {String(fallback.pages.length).padStart(2, '0')}</p>
 
+      <!-- 3D の雑誌の準備ができるまでの読み込み画面（JavaScript が動くときだけ出す） -->
+      <div class="showcase-loading" data-role="loading" aria-hidden="true">
+        <div class="showcase-loading-inner">
+          <p class="hud-label">LOADING</p>
+          <p class="mono-number showcase-loading-value" data-role="loading-value">0%</p>
+          <span class="showcase-loading-bar"><span data-role="loading-bar"></span></span>
+        </div>
+      </div>
+
       <script type="application/json" data-role="showcase" set:html={JSON.stringify(fallback).replace(/</g, '\\u003c')}></script>
     </>
   ) : (
@@ -71,10 +80,37 @@ const fallbackHref = first?.href ?? '#';
   /* 計器風パネル（トップでは絵に重なってよい） */
   .showcase-hud { position: absolute; z-index: 2; pointer-events: none; margin: 0; }
   .showcase-now { top: 1rem; right: 1rem; min-width: 180px; max-width: 46%; }
+  /* スマホ: 「NOW OPEN」の枠を小さな 1 行にする */
+  @media (max-width: 768px) {
+    .showcase-now { top: 0.6rem; right: 0.6rem; min-width: 0; max-width: 70%; padding: 0.35rem 0.7rem; display: flex; align-items: baseline; gap: 0.5rem; }
+    .showcase-now .hud-label { font-size: 0.6rem; white-space: nowrap; }
+    .showcase-title { font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .showcase-turn { left: 0.6rem; bottom: 0.6rem; font-size: 0.6rem; }
+  }
   .showcase-title { font-weight: 700; overflow-wrap: anywhere; }
   .showcase-turn { left: 1rem; bottom: 1rem; }
 
   .showcase-empty { margin: 2rem; }
+
+  /* 読み込み画面: JavaScript が動くときだけ出し、準備ができたら薄くして消す。3D が使えなければ出さない */
+  .showcase-loading {
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: 6;
+    place-items: center;
+    background: var(--paper);
+    transition: opacity 0.5s ease;
+  }
+  .js .showcase-loading { display: grid; }
+  .showcase[data-loaded] .showcase-loading { opacity: 0; pointer-events: none; }
+  .showcase[data-mode="flat"] .showcase-loading,
+  .showcase[data-loading-done] .showcase-loading { display: none; }
+  .showcase-loading-inner { display: flex; flex-direction: column; align-items: center; gap: 0.6rem; }
+  .showcase-loading-value { font-size: 2.4rem; line-height: 1; letter-spacing: 0.04em; }
+  .showcase-loading-bar { display: block; width: 160px; height: 2px; background: var(--line); overflow: hidden; }
+  .showcase-loading-bar span { display: block; height: 100%; width: 0; background: var(--accent); }
+  @media (prefers-reduced-motion: reduce) { .showcase-loading { transition: none; } }
 </style>
 
 <script>
