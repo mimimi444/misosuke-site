@@ -1,6 +1,5 @@
 // Showcase.astro のブラウザ側の処理。ランダムに作品を選び直し、three.js のシーンを動的に読み込む。
 import { pickShowcase, type Showcase, type ShowcaseCandidates } from './showcase';
-import { railHref } from './links';
 import { workPath } from './workMeta';
 import { setStage } from './stage';
 
@@ -8,9 +7,8 @@ import { setStage } from './stage';
 function hrefFor(show: Showcase, pageIndex: number): string {
   const page = show.pages[pageIndex];
   if (!page) return '#';
-  if (show.kind === 'album') return railHref(page.id, { slug: show.slug, page: pageIndex + 1 });
-  // 仮の雑誌: アルバムの表紙ならアルバム、1 枚ものなら作品
-  return show.pages[pageIndex]?.href ?? workPath(page.id);
+  // アルバムの表紙ならアルバム（1 ページ目から）、1 枚ものなら作品
+  return page.href ?? workPath(page.id);
 }
 
 const SWIPE_PX = 30;

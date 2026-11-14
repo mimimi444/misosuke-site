@@ -2,7 +2,6 @@
 // トップとタグページの「見せる」ページめくり。
 // JavaScript 前は固定内容（fallback）の最初の見開きを平面で出し、three.js の準備ができたらキャンバスに切り替える。
 import type { Showcase, ShowcaseCandidates } from '../lib/showcase';
-import { railHref } from '../lib/links';
 import { workPath } from '../lib/workMeta';
 
 interface Props {
@@ -14,7 +13,7 @@ const { candidates, fallback } = Astro.props;
 const firstPage = fallback?.pages[0];
 // JavaScript 前・WebGL なしのときのリンク先（最初の見開きの 1 ページ目）
 const first = fallback?.pages[0];
-const fallbackHref = !fallback || !first ? '#' : fallback.kind === 'album' ? railHref(first.id, { slug: fallback.slug, page: 1 }) : workPath(first.id);
+const fallbackHref = !first ? '#' : first.href ?? workPath(first.id);
 ---
 
 <section class="showcase" aria-label="作品の雑誌">

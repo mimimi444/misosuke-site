@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest';
-import { pickShowcase, defaultShowcase, MAX_MAGAZINE_PAGES, type ShowcaseCandidates, type ShowcasePage } from './showcase';
+import { pickShowcase, defaultShowcase, MAX_PICKUP, type ShowcaseCandidates } from './showcase';
 import type { MagazinePage } from './magazine/spread';
 
 const s = (i: number): MagazinePage => ({ id: `s${i}`, src: `/s${i}.webp`, title: `single ${i}` });
@@ -14,45 +14,34 @@ test('候補が無ければ null', () => {
 
 test('1 枚ものが 1 枚だけなら、その 1 枚の紙', () => {
   const c: ShowcaseCandidates = { albums: [], singles: [s(1)] };
-  expect(pickShowcase(c, () => 0)).toEqual({ kind: 'singles', title: s(1).title, pages: [s(1)] });
+  expect(pickShowcase(c, () => 0)).toEqual({ title: s(1).title, pages: [s(1)] });
 });
 
-test('アルバムと「1 枚ものを束ねた仮の雑誌」から 1 つ選ぶ', () => {
-  const c: ShowcaseCandidates = { albums: [a1], singles: [s(1), s(2)] };
-  expect(pickShowcase(c, () => 0)?.kind).toBe('album');
-  expect(pickShowcase(c, () => 0.99)?.kind).toBe('singles');
+test('アルバムを丸ごと開くことはなく、表紙（1 ページ目）だけが 1 枚ものと混ざる', () => {
+  for (const r of [0, 0.3, 0.6, 0.99]) {
+    const picked = pickShowcase({ albums: [a1, a2], singles: [s(1)] }, () => r)!;
+    expect(picked.title).toBe('ピックアップ');
+    expect(picked.pages.map((p) => p.id).sort()).toEqual(['a', 'c', 's1']);
+  }
 });
 
-test('仮の雑誌は最大 6 枚、重複しない', () => {
-  const picked = pickShowcase({ albums: [], singles: Array.from({ length: 9 }, (_, i) => s(i)) }, Math.random)!;
+test('アルバムの表紙は、アルバムのタイトルで、押すとアルバムを 1 ページ目から開く', () => {
+  const picked = pickShowcase({ albums: [a1], singles: [s(1)] }, () => 0)!;
+  const cover = picked.pages.find((p) => p.id === 'a')!;
+  expect(cover).toMatchObject({ title: 'アルバム1', href: '/albums/album-1' });
+  expect(picked.pages.find((p) => p.id === 's1')!.href).toBeUndefined();
+});
+
+test('束ねるのは最大 6 枚、重複しない', () => {
+  const picked = pickShowcase({ albums: [a1, a2], singles: Array.from({ length: 9 }, (_, i) => s(i)) }, Math.random)!;
+  expect(MAX_PICKUP).toBe(6);
   expect(picked.pages).toHaveLength(6);
   expect(new Set(picked.pages.map((p) => p.id)).size).toBe(6);
 });
 
-test('JavaScript 前の固定内容は、最新のアルバム（候補の先頭）', () => {
-  expect(defaultShowcase({ albums: [a1, a2], singles: [s(1)] })).toEqual({ kind: 'album', slug: a1.slug, title: a1.title, pages: a1.pages });
-});
-
-test('アルバムが無ければ、最新の 1 枚ものを最大 6 枚', () => {
+test('JavaScript 前の固定内容は、新しい 1 枚ものとアルバムの表紙を交互に最大 6 枚', () => {
   const singles = Array.from({ length: 8 }, (_, i) => s(i));
-  expect(defaultShowcase({ albums: [], singles })).toEqual({ kind: 'singles', title: '新着', pages: singles.slice(0, 6) });
-});
-
-test('ページ数の多いアルバムは、先頭の 12 ページだけを雑誌にする（読み込みとメモリを抑える）', () => {
-  const big = { slug: 'big', title: '分厚い', pages: Array.from({ length: 30 }, (_, i) => page(`p${i}`)) };
-  expect(MAX_MAGAZINE_PAGES).toBe(12);
-  expect(pickShowcase({ albums: [big], singles: [] }, () => 0)!.pages.map((p) => p.id)).toEqual(big.pages.slice(0, 12).map((p) => p.id));
-  expect(defaultShowcase({ albums: [big], singles: [] })!.pages).toHaveLength(12);
-});
-
-test('仮の雑誌には、アルバムの表紙（1 ページ目）も混ざり、押すとアルバムの 1 ページ目から開く', () => {
-  const picked = pickShowcase({ albums: [a1, a2], singles: [s(1)] }, () => 0.99)!;
-  expect(picked.kind).toBe('singles');
-  const ids = picked.pages.map((p) => p.id).sort();
-  expect(ids).toEqual(['a', 'c', 's1']);
-  const pages = picked.pages as ShowcasePage[];
-  const cover = pages.find((p) => p.id === 'a')!;
-  expect(cover.href).toBe('/albums/album-1');
-  expect(cover.title).toBe('アルバム1');
-  expect(pages.find((p) => p.id === 's1')!.href).toBeUndefined();
+  const d = defaultShowcase({ albums: [a1, a2], singles })!;
+  expect(d.title).toBe('新着');
+  expect(d.pages.map((p) => p.id)).toEqual(['s0', 'a', 's1', 'c', 's2', 's3']);
 });

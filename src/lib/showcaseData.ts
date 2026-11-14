@@ -4,7 +4,7 @@ import type { getDb } from '../db/client';
 import { albumImages, albums, images, imageTags, tags } from '../db/schema';
 import type { MagazinePage } from './magazine/spread';
 import { r2Url } from './r2url';
-import { MAX_MAGAZINE_PAGES, type ShowcaseCandidates } from './showcase';
+import type { ShowcaseCandidates } from './showcase';
 import { displayTitle } from './workMeta';
 
 /** 候補として持つ数（HTML に埋め込むので増やしすぎない） */
@@ -43,8 +43,8 @@ export async function loadShowcaseCandidates(db: ReturnType<typeof getDb>, opts:
       .orderBy(asc(albumImages.sortOrder));
     for (const r of pageRows) {
       const list = pagesByAlbum.get(r.albumId) ?? [];
-      // HTML に埋め込む量を抑えるため、雑誌に使う先頭のページだけを持つ
-      if (list.length >= MAX_MAGAZINE_PAGES) continue;
+      // 雑誌にはアルバムの表紙（1 ページ目）だけを使うので、HTML に埋め込むのも 1 ページ目だけ
+      if (list.length >= 1) continue;
       list.push({ id: r.id, src: r2Url(r.r2Key), title: displayTitle(r.title) });
       pagesByAlbum.set(r.albumId, list);
     }
