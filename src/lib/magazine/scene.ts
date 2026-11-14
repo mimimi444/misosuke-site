@@ -167,7 +167,52 @@ type ReadBook = {
   current: number;
   turning: { leaf: number; from: number; to: number; start: number; next: number } | null;
   disposed: boolean;
+  /** アルバムの 2 ページ目以降が並ぶ帯（1 枚ものは null） */
+  strip: Strip | null;
 };
+
+/**
+ * アルバムの 2 ページ目以降の絵（本来の縦横比）。紙の下から右へ滑り出して一列に並び、そのまま左へ流れる。
+ * 先頭は紙の下へ潜り、右の端から出直す。右は画面の端で見切れる。
+ */
+type Strip = {
+  group: THREE.Group;
+  items: { mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>; w: number; u: number }[];
+  textures: THREE.Texture[];
+  /** 一列の長さ（隙間を含む） */
+  length: number;
+  /** 滑り出しを始めた時刻（カメラが正面に来てから） */
+  start: number | null;
+};
+
+/** 帯の絵の高さ（紙面の絵の枠の高さに対する割合）、隙間、流れる速さ（単位/秒） */
+const STRIP_SCALE = 0.82;
+const STRIP_GAP = 0.14;
+const STRIP_SPEED = 0.16;
+/** 帯の右端をどこまで埋めるか（紙の右端からの距離。画面の外まで届かせて見切れさせる） */
+const STRIP_SPAN = 7;
+/** 1 枚ずつずらして滑り出す間隔と、滑り出しにかける時間（秒） */
+const STRIP_STAGGER = 0.12;
+const STRIP_SLIDE_SEC = 1.1;
+/** 帯に使う絵の枚数の上限と、テクスチャの長辺（px） */
+const STRIP_MAX_PAGES = 10;
+const STRIP_TEX_PX = 720;
+/** 紙面の絵の枠（paperTexture の余白と同じ割合）。帯の絵の中心を紙面の絵の中心に揃える */
+const IMAGE_BOX_H = (1200 - 70 * 2 - 90) / 1200;
+const IMAGE_BOX_CENTER = (70 + (1200 - 70 * 2 - 90) / 2) / 1200 - 0.5;
+
+/** 帯用に縮めた絵のテクスチャ */
+function stripTexture(img: HTMLImageElement): THREE.CanvasTexture {
+  const k = Math.min(1, STRIP_TEX_PX / Math.max(img.naturalWidth, img.naturalHeight));
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(img.naturalWidth * k));
+  c.height = Math.max(1, Math.round(img.naturalHeight * k));
+  c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
 
 function disposeMaterial(m: THREE.Material, keep?: THREE.Texture) {
   const map = (m as THREE.MeshBasicMaterial).map;
@@ -321,8 +366,67 @@ export async function createShowcaseScene(
   /** read・show のたびに増やす。読み込み待ちの間に閉じた・切り替えた read の続きを捨てる */
   let readToken = 0;
 
+  const disposeStrip = (strip: Strip) => {
+    strip.items.forEach((it) => { it.mesh.geometry.dispose(); it.mesh.material.dispose(); });
+    strip.textures.forEach((t) => t.dispose());
+  };
+
+  /** アルバムの 2 ページ目以降を読み込み、紙の下に帯を用意する（滑り出しは frame で） */
+  const buildStrip = async (b: ReadBook) => {
+    const rest = b.pages.slice(1, 1 + STRIP_MAX_PAGES);
+    if (rest.length === 0) return;
+    const imgs = (await Promise.all(rest.map((p) => loadImage(p.src)))).filter((i): i is HTMLImageElement => !!i);
+    if (b.disposed || imgs.length === 0) return;
+    const textures = imgs.map(stripTexture);
+    const h = PAPER.height * IMAGE_BOX_H * STRIP_SCALE;
+    const group = new THREE.Group();
+    // 紙（表紙の外側）より下に置き、紙の下に潜ったときは紙に隠れる
+    group.position.set(0, -0.03, PAPER.height * IMAGE_BOX_CENTER);
+    const items: Strip['items'] = [];
+    let u = 0;
+    // 画面の外まで届くまで、同じ並びを繰り返す
+    for (let k = 0; u < STRIP_SPAN || k % textures.length !== 0; k++) {
+      const tex = textures[k % textures.length]!;
+      const img = tex.image as HTMLCanvasElement;
+      const w = h * (img.width / img.height);
+      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0 });
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+      mesh.rotation.x = -Math.PI / 2; // 紙と同じく上を向けて寝かせる
+      group.add(mesh);
+      items.push({ mesh, w, u });
+      u += w + STRIP_GAP;
+      if (k > 200) break;
+    }
+    b.group.add(group);
+    b.strip = { group, items, textures, length: u, start: null };
+  };
+
+  /** 帯の位置と濃さ。e は読むモードへの進み */
+  const updateStrip = (strip: Strip, time: number, e: number) => {
+    const W = PAPER.width;
+    if (strip.start === null && e >= 1) strip.start = time;
+    const t = strip.start === null ? -1 : time - strip.start;
+    const slideEnd = STRIP_SLIDE_SEC + STRIP_STAGGER * Math.min(strip.items.length, 8);
+    const offset = motion && t > slideEnd ? (t - slideEnd) * STRIP_SPEED : 0;
+    // 拡大中は帯を消して絵だけにする
+    const opacity = zoom.scale > 1.001 ? 0 : e;
+    strip.items.forEach((it, i) => {
+      // 流れているときの左端の位置。紙の下に完全に潜ったら、一列の長さだけ右へ出直す
+      let x = W + STRIP_GAP + it.u - offset;
+      if (x + it.w < W - 0.02) x += strip.length * Math.ceil((W - 0.02 - x - it.w) / strip.length);
+      // 滑り出し: 右ページの真下から、1 枚ずつずらして所定の位置へ
+      const hidden = W / 2 - it.w / 2;
+      const sIn = !motion ? (strip.start === null ? 0 : 1) : t < 0 ? 0 : smooth(Math.min(1, Math.max(0, (t - i * STRIP_STAGGER) / STRIP_SLIDE_SEC)));
+      const left = hidden + (x - hidden) * sIn;
+      it.mesh.position.set(left + it.w / 2, 0, 0);
+      it.mesh.material.opacity = opacity;
+      it.mesh.visible = opacity > 0.001;
+    });
+  };
+
   const disposeBook = (b: ReadBook) => {
     b.disposed = true;
+    if (b.strip) disposeStrip(b.strip);
     magazine.remove(b.group);
     for (const l of b.leaves) {
       l.geo.dispose();
@@ -449,6 +553,8 @@ export async function createShowcaseScene(
     ground.scale.setScalar(1 - magazine.position.y * 0.6);
     magazine.updateMatrixWorld();
 
+    if (book?.strip) updateStrip(book.strip, time, e);
+
     // 見せる構図
     centroid.set(0, 0, 0);
     for (let k = 0; k < coverPos.count; k++) centroid.add(tmp.set(coverPos.getX(k), coverPos.getY(k), coverPos.getZ(k)));
@@ -515,7 +621,7 @@ export async function createShowcaseScene(
       if (disposed || token !== readToken) return;
       if (book) disposeBook(book);
       const group = new THREE.Group();
-      const b: ReadBook = { group, pages, leaves: [], current: start, turning: null, disposed: false };
+      const b: ReadBook = { group, pages, leaves: [], current: start, turning: null, disposed: false, strip: null };
       b.leaves = pages.map((_, idx) => {
         const geo = pageGeometry();
         const front = new THREE.MeshBasicMaterial({ map: blankRead, side: THREE.FrontSide });
@@ -527,6 +633,7 @@ export async function createShowcaseScene(
       book = b;
       mode = 'read';
       loadAround(b);
+      void buildStrip(b);
     },
     show() {
       readToken++;
