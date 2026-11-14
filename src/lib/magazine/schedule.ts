@@ -2,13 +2,21 @@
 
 const T_FLIP = 1.9;      // 1 枚めくるのにかかる秒数
 const T_GAP = 2.5;       // 次の紙をめくり始めるまでの間隔
-const T_HOLD_END = 1.2;  // 最後までめくってから戻し始めるまで
+const T_HOLD_END = 3.0;  // 最後のページを開いてから戻し始めるまで（最後のページをしっかり見せる）
 const T_RIFFLE = 0.12;   // パラパラ戻すときの 1 枚ごとの遅れ
 const T_BACK = 0.8;      // 1 枚が戻るのにかかる秒数
 const T_REST = 1.8;      // 戻し終わってから次の周回まで
 
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+
+/**
+ * めくる紙の枚数。最後のページ（最後の紙の表）を右ページに開いたところで止めるので、最後の紙はめくらない。
+ * pageCount ページなら pageCount - 1 枚をめくる。
+ */
+export function flipCount(pageCount: number): number {
+  return Math.max(0, pageCount - 1);
+}
 
 /** めくり終わって戻し始めるまでの時刻（これ以降は RIFFLE） */
 export function forwardEnd(leafCount: number): number {

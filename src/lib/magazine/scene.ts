@@ -8,7 +8,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { BokehPass } from 'three/addons/postprocessing/BokehPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { PAPER, leafOffsets, shapePage, vertexCount } from './pageShape';
-import { cycleLength, forwardEnd, leafProgress, manualTurn } from './schedule';
+import { cycleLength, flipCount, forwardEnd, leafProgress, manualTurn } from './schedule';
 import { buildLeaves, rightPageIndex as rightIndexOf } from './spread';
 import type { MagazinePage } from './spread';
 import { fitDistance, imageRect, nextPageIndex, type Insets, type Zoom } from './reading';
@@ -550,6 +550,8 @@ export async function createShowcaseScene(
   const WORLD_UP = new THREE.Vector3(0, 1, 0);
 
   const n = leaves.length;
+  /** めくる紙の枚数（最後のページで止めるので、最後の紙はめくらない） */
+  const flips = flipCount(n);
   let raf = 0, disposed = false, lastState = '';
   const clock = new THREE.Clock();
   let prevTime = 0;
@@ -614,15 +616,15 @@ export async function createShowcaseScene(
     if (!book) {
       let flipping = 0, done = 0;
       leafGeos.forEach((geo, i) => {
-        const p = leafProgress(i, showT, n);
+        const p = i < flips ? leafProgress(i, showT, flips) : 0;
         if (p > 0.02 && p < 0.98) flipping++;
         if (p >= 0.98) done++;
         const o = leafOffsets(i, n);
         updateShape(geo, p, o.offRight, o.offLeft, o.air, motion ? 0.18 * Math.sin(time * 2.4 + i) : 0);
       });
 
-      const local = showT % cycleLength(n);
-      const state: ShowcaseState['state'] = motion && local > forwardEnd(n) ? 'RIFFLE' : flipping ? 'TURNING' : 'HOLDING';
+      const local = showT % cycleLength(flips);
+      const state: ShowcaseState['state'] = motion && local > forwardEnd(flips) ? 'RIFFLE' : flipping ? 'TURNING' : 'HOLDING';
       const rightPageIndex = rightIndexOf(done, opts.pages.length);
       showRightLeaf = done;
       const summary = `${state}|${done}`;
@@ -788,7 +790,7 @@ export async function createShowcaseScene(
     },
     flip(delta) {
       if (book || leafGeos.length === 0) return;
-      const m = manualTurn(manual ? manual.target : showT, leafGeos.length, delta);
+      const m = manualTurn(manual ? manual.target : showT, flips, delta);
       if (!m) return;
       showT = m.jump;
       if (!motion) { showT = m.target; manual = null; return; }

@@ -1,7 +1,13 @@
 import { describe, test, expect } from 'vitest';
-import { leafProgress, cycleLength, forwardEnd } from './schedule';
+import { leafProgress, cycleLength, forwardEnd, flipCount } from './schedule';
 
-const fwdEnd = 3 * 2.5 + 1.2;
+const fwdEnd = 3 * 2.5 + 3.0;
+
+test('最後のページで止めるので、最後の紙はめくらない', () => {
+  expect(flipCount(5)).toBe(4);
+  expect(flipCount(1)).toBe(0);
+  expect(flipCount(0)).toBe(0);
+});
 
 test('めくり始めは 0、1.9 秒でめくり終わる', () => {
   expect(leafProgress(0, 0, 3)).toBe(0);
