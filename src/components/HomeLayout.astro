@@ -41,7 +41,9 @@ const showcase = showcaseFromRail(items, free);
     display: grid;
     grid-template-columns: var(--rail-w) minmax(0, 1fr);
     height: calc(100vh - var(--header-h));
-    height: calc(100dvh - var(--header-h));
+    /* スマホでアドレスバーが出たり引っ込んだりしても高さが変わらないよう、小さい方のビューポートの高さに合わせる
+       （変わるたびに 3D の画面を作り直して、ちらつくのを防ぐ） */
+    height: calc(100svh - var(--header-h));
     border-bottom: 1px solid var(--line);
   }
   .home:not(:has(.rail)) { grid-template-columns: minmax(0, 1fr); }

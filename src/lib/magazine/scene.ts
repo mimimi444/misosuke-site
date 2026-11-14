@@ -438,9 +438,10 @@ export async function createShowcaseScene(
   const bokehUniforms = bokeh.uniforms as Record<string, { value: number }>;
 
   let viewW = 1, viewH = 1;
+  let sized = false;
   const resize = () => {
     const w = canvas.clientWidth, h = canvas.clientHeight;
-    if (w === 0 || h === 0) return;
+    if (w === 0 || h === 0 || (w === viewW && h === viewH)) return;
     viewW = w;
     viewH = h;
     renderer.setSize(w, h, false);
@@ -448,6 +449,9 @@ export async function createShowcaseScene(
     camera.aspect = w / h;
     camera.setFocalLength(FOCAL_MM);
     camera.updateProjectionMatrix();
+    // 大きさを変えると描いた絵が消えるので、次のフレームを待たずにすぐ描き直す（空白のコマでちらつかないように）
+    if (sized) composer.render();
+    sized = true;
   };
   const observer = new ResizeObserver(resize);
   observer.observe(canvas);
