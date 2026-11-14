@@ -8,8 +8,6 @@ import { eq } from 'drizzle-orm';
 import { env } from 'cloudflare:workers';
 import { tagSlug } from '../../lib/tags';
 import { loadRailPage } from '../../lib/rail';
-import { loadShowcaseCandidates } from '../../lib/showcaseData';
-import { defaultShowcase } from '../../lib/showcase';
 import { RAIL_PAGE_SIZE } from '../api/rail';
 
 const db = getDb(env.DB);
@@ -18,18 +16,13 @@ const slug = tagSlug(Astro.params.slug ?? '');
 const [tag] = await db.select().from(tags).where(eq(tags.slug, slug));
 if (!tag) return Astro.redirect('/');
 
-const [rail, candidates] = await Promise.all([
-  loadRailPage(db, { tagSlug: slug, limit: RAIL_PAGE_SIZE }),
-  loadShowcaseCandidates(db, { tagSlug: slug }),
-]);
+const rail = await loadRailPage(db, { tagSlug: slug, limit: RAIL_PAGE_SIZE });
 ---
 
 <BaseLayout title={`#${tag.name}`}>
   <HomeLayout
     items={rail.items}
     nextCursor={rail.nextCursor}
-    candidates={candidates}
-    fallback={defaultShowcase(candidates)}
     heading={`#${tag.name}`}
     tag={tag.slug}
   />

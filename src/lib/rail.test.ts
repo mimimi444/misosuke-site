@@ -26,7 +26,7 @@ import { buildRailItems, type AlbumInfo, type RailRow } from './rail';
 const row = (id: string, createdAt: string, extra: Partial<RailRow> = {}): RailRow => ({
   id, title: `t-${id}`, description: null, r2Key: `k/${id}.webp`, thumbR2Key: `th/${id}.webp`, createdAt, tagList: null, ...extra,
 });
-const page = (id: string, n: number, createdAt: string, matches = true) => ({ id, thumb: `/th/${id}`, page: n, createdAt, matches });
+const page = (id: string, n: number, createdAt: string, matches = true) => ({ id, thumb: `/th/${id}`, src: `/full/${id}`, page: n, createdAt, matches });
 
 describe('作品一覧: アルバムを 1 つの束にまとめる', () => {
   // アルバム A: a1(古い) a2 a3(新しい)。単品 w は a3 と a1 の間
@@ -47,6 +47,8 @@ describe('作品一覧: アルバムを 1 つの束にまとめる', () => {
     expect(items.map((i) => [i.kind, i.id])).toEqual([['album', 'a3'], ['work', 'w']]);
     const a = items[0]!;
     expect(a.thumb).toBe('/th/a1');
+    expect(a.pageId).toBe('a1');
+    expect(a.src).toBe('/full/a1');
     expect(a.stack).toEqual(['/th/a2', '/th/a3']);
     expect(a.pageCount).toBe(3);
     expect(a.title).toBe('アルバムA');

@@ -6,6 +6,7 @@ import { railHref } from './links';
 import { albumHref } from './albumSlug';
 import { loadImageAlbums, type ImageAlbum } from './feedAlbums';
 import { thumbSrc } from './imageFiles';
+import { r2Url } from './r2url';
 import { altText, displayTitle, formatPostedDate } from './workMeta';
 
 export type RailItem = {
@@ -13,6 +14,9 @@ export type RailItem = {
   kind: 'work' | 'album';
   id: string;
   thumb: string;
+  /** 表に見えている絵（アルバムなら束の表の絵）の ID と、その大きい画像。トップの雑誌に使う */
+  pageId: string;
+  src: string;
   /** 束の後ろに重ねるページのサムネイル（最大 2 枚）。1 枚ものは空 */
   stack: string[];
   pageCount: number;
@@ -54,7 +58,7 @@ export type AlbumInfo = {
   slug: string;
   title: string;
   coverId: string | null;
-  pages: { id: string; thumb: string; page: number; createdAt: string; matches: boolean }[];
+  pages: { id: string; thumb: string; src: string; page: number; createdAt: string; matches: boolean }[];
 };
 
 /** 束の後ろに重ねる枚数 */
@@ -84,6 +88,8 @@ export function buildRailItems(
         kind: 'work',
         id: r.id,
         thumb: thumbSrc(r),
+        pageId: r.id,
+        src: r2Url(r.r2Key),
         stack: [],
         pageCount: 1,
         title: displayTitle(r.title),
@@ -103,6 +109,8 @@ export function buildRailItems(
       kind: 'album',
       id: r.id,
       thumb: top.thumb,
+      pageId: top.id,
+      src: top.src,
       stack: info.pages.filter((p) => p.id !== top.id).slice(0, STACK_BEHIND).map((p) => p.thumb),
       pageCount: info.pages.length,
       title: info.title,
@@ -140,7 +148,7 @@ async function loadAlbumInfo(db: ReturnType<typeof getDb>, slugs: string[], tagS
     .orderBy(asc(albums.slug), asc(albumImages.sortOrder));
   for (const r of rows) {
     const info = map.get(r.slug) ?? { slug: r.slug, title: r.title, coverId: r.coverId, pages: [] };
-    info.pages.push({ id: r.id, thumb: thumbSrc(r), page: info.pages.length + 1, createdAt: r.createdAt, matches: !!r.matches });
+    info.pages.push({ id: r.id, thumb: thumbSrc(r), src: r2Url(r.r2Key), page: info.pages.length + 1, createdAt: r.createdAt, matches: !!r.matches });
     map.set(r.slug, info);
   }
   return map;

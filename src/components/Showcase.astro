@@ -1,19 +1,17 @@
 ---
 // トップとタグページの「見せる」ページめくり。
 // JavaScript 前は固定内容（fallback）の最初の見開きを平面で出し、three.js の準備ができたらキャンバスに切り替える。
-import type { Showcase, ShowcaseCandidates } from '../lib/showcase';
-import { workPath } from '../lib/workMeta';
+import type { Showcase } from '../lib/showcase';
 
 interface Props {
-  candidates: ShowcaseCandidates;
-  fallback: Showcase | null;
+  showcase: Showcase | null;
 }
-const { candidates, fallback } = Astro.props;
+const { showcase: fallback } = Astro.props;
 // 最初の見開き: 左は表紙の内側（無地）、右に 1 枚目の絵
 const firstPage = fallback?.pages[0];
 // JavaScript 前・WebGL なしのときのリンク先（最初の見開きの 1 ページ目）
 const first = fallback?.pages[0];
-const fallbackHref = !first ? '#' : first.href ?? workPath(first.id);
+const fallbackHref = first?.href ?? '#';
 ---
 
 <section class="showcase" aria-label="作品の雑誌">
@@ -34,7 +32,7 @@ const fallbackHref = !first ? '#' : first.href ?? workPath(first.id);
       <p class="showcase-hud showcase-turn hud-label" data-role="turn">AUTO TURN ・ 01 / {String(fallback.pages.length).padStart(2, '0')}</p>
       <p class="showcase-hud showcase-state state-label" data-role="state">HOLDING</p>
 
-      <script type="application/json" data-role="candidates" set:html={JSON.stringify(candidates).replace(/</g, '\\u003c')}></script>
+      <script type="application/json" data-role="showcase" set:html={JSON.stringify(fallback).replace(/</g, '\\u003c')}></script>
     </>
   ) : (
     <div class="empty showcase-empty">まだ作品がありません。</div>

@@ -1,14 +1,13 @@
-// Showcase.astro のブラウザ側の処理。ランダムに作品を選び直し、three.js のシーンを動的に読み込む。
-import { pickShowcase, type Showcase, type ShowcaseCandidates } from './showcase';
-import { workPath } from './workMeta';
+// Showcase.astro のブラウザ側の処理。three.js のシーンを動的に読み込む（中身は作品一覧の先頭と同じ並び）。
+import type { Showcase } from './showcase';
 import { setStage } from './stage';
 
 /** 開いている見開きの右ページの作品へのリンク */
 function hrefFor(show: Showcase, pageIndex: number): string {
   const page = show.pages[pageIndex];
   if (!page) return '#';
-  // アルバムの表紙ならアルバム（1 ページ目から）、1 枚ものなら作品
-  return page.href ?? workPath(page.id);
+  // 作品一覧のサムネイルと同じところを開く
+  return page.href;
 }
 
 const SWIPE_PX = 30;
@@ -42,17 +41,16 @@ function bindSwipe(root: HTMLElement, hit: HTMLAnchorElement, flip: (delta: 1 | 
 }
 
 async function setup(root: HTMLElement) {
-  const json = root.querySelector<HTMLScriptElement>('[data-role="candidates"]');
+  const json = root.querySelector<HTMLScriptElement>('[data-role="showcase"]');
   const canvas = root.querySelector<HTMLCanvasElement>('.showcase-canvas');
   const hit = root.querySelector<HTMLAnchorElement>('.showcase-hit');
   if (!json || !canvas || !hit) return setStage(null);
 
-  // 3D が使えなければ、HTML の固定内容（平面の見開き）のまま。選び直すと表示とリンクが食い違うため先に確かめる
+  // 3D が使えなければ、HTML の固定内容（平面の見開き）のまま
   const { canUseWebGL, createShowcaseScene } = await import('./magazine/scene');
   if (!canUseWebGL()) return setStage(null);
 
-  const candidates = JSON.parse(json.textContent || '{}') as ShowcaseCandidates;
-  const show = pickShowcase(candidates, Math.random);
+  const show = JSON.parse(json.textContent || 'null') as Showcase | null;
   if (!show) return setStage(null);
 
   const set = (role: string, text: string) => {

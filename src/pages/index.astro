@@ -5,17 +5,12 @@ import HomeLayout from '../components/HomeLayout.astro';
 import { getDb } from '../db/client';
 import { env } from 'cloudflare:workers';
 import { loadRailPage } from '../lib/rail';
-import { loadShowcaseCandidates } from '../lib/showcaseData';
-import { defaultShowcase } from '../lib/showcase';
 import { RAIL_PAGE_SIZE } from './api/rail';
 
 const db = getDb(env.DB);
-const [rail, candidates] = await Promise.all([
-  loadRailPage(db, { limit: RAIL_PAGE_SIZE }),
-  loadShowcaseCandidates(db),
-]);
+const rail = await loadRailPage(db, { limit: RAIL_PAGE_SIZE });
 ---
 
 <BaseLayout title="JJJ">
-  <HomeLayout items={rail.items} nextCursor={rail.nextCursor} candidates={candidates} fallback={defaultShowcase(candidates)} />
+  <HomeLayout items={rail.items} nextCursor={rail.nextCursor} />
 </BaseLayout>
