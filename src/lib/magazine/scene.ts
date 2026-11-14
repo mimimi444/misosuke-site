@@ -544,7 +544,10 @@ export async function createShowcaseScene(
       const y = top + 0.004 + 0.004 / (1 + d) - 0.0003 * k;
       it.mesh.position.set(x, y, 0);
       it.veil.position.set(x, y + 0.0001, 0);
-      const opacity = zoomed && i !== b.current ? 0 : e;
+      // 戻るときは、紙の外に並ぶ絵が斜めの構図で宙に浮いて見えないよう、戻り始めてすぐに消す
+      // （表示中の絵は show() で紙に描き直しているので、板が消えても見え方は変わらない）
+      const fadeIn = mode === 'show' ? Math.max(0, (e - 0.8) / 0.2) : e;
+      const opacity = zoomed && i !== b.current ? 0 : fadeIn;
       it.mesh.material.opacity = opacity;
       it.mesh.visible = opacity > 0.001;
       it.veil.material.opacity = opacity * GALLERY_VEIL * Math.min(1, d * 2);

@@ -55,7 +55,7 @@ export async function loadDetail(db: Db, target: DetailTarget): Promise<DetailDa
       kind: 'album',
       title: album.title,
       description: album.description?.trim() || null,
-      album: pages.length >= 2 ? { title: album.title, slug: album.slug } : null,
+      album: pages.length >= 1 ? { title: album.title, slug: album.slug } : null,
       pages,
       startIndex,
     };

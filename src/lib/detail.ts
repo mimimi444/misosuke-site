@@ -19,7 +19,7 @@ export type DetailData = {
   /** アルバムならアルバムの、作品なら作品の表示タイトル */
   title: string;
   description: string | null;
-  /** アルバム（作品なら所属アルバム）。2 ページ以上のアルバムだけ */
+  /** アルバム（作品なら所属アルバム。1 ページだけのアルバムを含む） */
   album: { title: string; slug: string } | null;
   pages: DetailPage[];
   startIndex: number;
