@@ -226,7 +226,7 @@ type ReadBook = {
  * 開いて少ししてから、ほかのページが表示中の絵の下から横へ滑り出す。ページを送ると列ごと横へずれる。
  */
 type GalleryItem = {
-  mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
+  mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshStandardMaterial>;
   veil: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
   w: number;
   /** 列の中での中心の位置 */
@@ -469,6 +469,7 @@ export async function createShowcaseScene(
     g.items.forEach((it) => {
       it.mesh.material.map?.dispose();
       it.mesh.geometry.dispose();
+      glowMats.delete(it.mesh.material);
       it.mesh.material.dispose();
       it.veil.geometry.dispose();
       it.veil.material.dispose();
@@ -487,7 +488,9 @@ export async function createShowcaseScene(
       const scale = Math.min(boxW / aspect, boxH);
       const w = scale * aspect, h = scale;
       if (i > 0) c += items[i - 1]!.w / 2 + GALLERY_GAP + w / 2;
-      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: colors.sheet, transparent: true, opacity: 0 }));
+      // 紙と同じく、照明の切り替えに合わせて本来の色へ移る材質
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), paperMat({ color: colors.sheet, side: THREE.FrontSide, transparent: true, roughness: 1 }));
+      mesh.material.opacity = 0;
       const veil = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: colors.sheet, transparent: true, opacity: 0, depthWrite: false }));
       mesh.rotation.x = veil.rotation.x = -Math.PI / 2; // 紙と同じく上を向けて寝かせる
       group.add(mesh, veil);
@@ -506,15 +509,17 @@ export async function createShowcaseScene(
         void loadImage(it.src).then((img) => {
           if (b.disposed || it.tex !== 'loading') return;
           if (!img) { it.tex = 'none'; return; }
-          it.mesh.material.map = imageTexture(img);
+          setPaperMap(it.mesh.material, imageTexture(img));
           it.mesh.material.color.set(0xffffff);
+          it.mesh.material.emissive.set(0xffffff);
           it.mesh.material.needsUpdate = true;
           it.tex = 'done';
         });
       } else if (dist > GALLERY_WINDOW * 2 && it.tex === 'done') {
         it.mesh.material.map?.dispose();
-        it.mesh.material.map = null;
+        it.mesh.material.map = it.mesh.material.emissiveMap = null;
         it.mesh.material.color.set(colors.sheet);
+        it.mesh.material.emissive.set(colors.sheet);
         it.mesh.material.needsUpdate = true;
         it.tex = 'none';
       }
@@ -611,6 +616,8 @@ export async function createShowcaseScene(
   /** 見せるモードで右ページに見えている紙（leafGeos の番号。全部めくれていれば leafGeos.length） */
   let showRightLeaf = 0;
   let showFlipping = 0, showDone = 0;
+  /** 詳細から戻るとき、戻った先の雑誌で見ていたページの紙がある高さ（入れ替えの位置合わせ） */
+  let returnOff: number | null = null;
 
   /**
    * 詳細から戻ったとき、雑誌に無い作品を見ていたら、その作品の紙を右ページの一番上にのせて見せ、少ししてからめくって消す。
@@ -744,7 +751,10 @@ export async function createShowcaseScene(
         if (key === l.shaped) return;
         l.shaped = key;
         const o = leafOffsets(i, count);
-        updateShape(l.geo, l.p, o.offRight * k, o.offLeft * k, o.air * k, flutter, e, false);
+        let offRight = o.offRight * k;
+        // 見せるモードへ戻る途中は、表示中の紙の高さを、戻った先の雑誌でそのページがある高さへ近づける（入れ替えで跳ばない）
+        if (mode === 'show' && returnOff !== null && i === b.current) offRight += (returnOff - offRight) * (1 - e);
+        updateShape(l.geo, l.p, offRight, o.offLeft * k, o.air * k, flutter, e, false);
       });
     }
 
@@ -761,7 +771,9 @@ export async function createShowcaseScene(
 
     if (book?.gallery) {
       const k = Math.min(1, READ_STACK / Math.max(book.leaves.length, 1));
-      updateGallery(book, book.gallery, time, e, leafOffsets(0, book.leaves.length).offRight * k);
+      let top = leafOffsets(0, book.leaves.length).offRight * k;
+      if (mode === 'show' && returnOff !== null) top += (returnOff - top) * (1 - e);
+      updateGallery(book, book.gallery, time, e, top);
     }
     if (book && passing) {
       // 見えていたページが左へめくれ、その下から選んだ作品が現れる（カメラの移動と同時に）
@@ -889,6 +901,14 @@ export async function createShowcaseScene(
       const token = ++guestToken;
       mode = 'show';
       zoom = { scale: 1, x: 0, y: 0 };
+      returnOff = null;
+      // アルバム: 表示中の絵は紙の上に寝かせた平らな板なので、紙が丸まると紙に隠れる。
+      // 戻る間は同じ絵を紙そのものに描き、紙と一緒に曲がるようにする（板は薄くして消える）
+      if (book?.gallery) {
+        const tex = book.gallery.items[book.current]?.mesh.material.map;
+        const leaf = book.leaves[0];
+        if (tex && leaf && tex.image instanceof HTMLCanvasElement) setPaperMap(leaf.front, paperTexture(tex.image, false, colors, READ_TEX_SCALE));
+      }
       if (!viewed) return;
       const now = clock.getElapsedTime();
       manual = null;
@@ -897,10 +917,14 @@ export async function createShowcaseScene(
         // 雑誌にある作品: そのページを開いたところで、しばらく止めておく
         showT = openTime(index, flips);
         holdUntil = now + MOVE_SEC + MANUAL_HOLD_SEC;
+        returnOff = leafOffsets(index, n).offRight;
         return;
       }
-      // 雑誌に無い作品: その作品の紙を一番上にのせ、しばらく見せてからめくる
+      // 雑誌に無い作品: その作品の紙を一番上にのせ、しばらく見せてからめくる。
+      // 下の雑誌は、めくっている途中で止まっていると入れ替えの瞬間に現れるので、開いていたページで止めておく
+      showT = openTime(showP.filter((p) => p >= 0.5).length, flips);
       holdUntil = now + MOVE_SEC + GUEST_HOLD_SEC + GUEST_FLIP_SEC;
+      returnOff = leafOffsets(0, n).offRight + g * 2; // のせる紙の高さ（updateGuest と同じ）
       void loadImage(viewed.src).then((img) => {
         if (disposed || token !== guestToken || !img) return;
         const geo = pageGeometry();
