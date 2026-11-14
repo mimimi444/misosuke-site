@@ -207,7 +207,7 @@ const GALLERY_STAGGER = 0.08;
 const GALLERY_SLIDE_SEC = 0.55;
 /** 絵と絵の隙間、表示中以外を覆う白の濃さ */
 const GALLERY_GAP = 0.12;
-const GALLERY_VEIL = 0.8;
+const GALLERY_VEIL = 0.5;
 /** 表示中のページから前後この枚数の絵を読み込み、離れたら手放す */
 const GALLERY_WINDOW = 3;
 const GALLERY_TEX_PX = 1600;
