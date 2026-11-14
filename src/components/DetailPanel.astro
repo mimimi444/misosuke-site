@@ -17,6 +17,16 @@ const isAlbum = detail?.kind === 'album';
 ---
 
 <div class="detail" role="dialog" aria-modal="true" aria-labelledby="detail-title" hidden={!detail}>
+  <!-- 詳細中は作品一覧を隠し、その場所に「一覧へ戻る」とページ送りを置く -->
+  <nav class="detail-rail" aria-label="作品の操作">
+    <button type="button" class="btn btn-ghost btn-sm detail-back" data-action="close" aria-label="一覧に戻る">← FEED</button>
+    <div class="detail-pager" data-role="nav" hidden={total < 2}>
+      <button type="button" class="btn btn-ghost btn-sm" data-action="prev" aria-label="前のページ">←</button>
+      <span class="mono-number detail-rail-counter" data-role="rail-counter">{pad((detail?.startIndex ?? 0) + 1)}<span class="detail-rail-total"> / {pad(total)}</span></span>
+      <button type="button" class="btn btn-ghost btn-sm" data-action="next" aria-label="次のページ">→</button>
+    </div>
+  </nav>
+
   <div class="detail-view" data-role="view">
     <div class="detail-flat" data-role="flat">
       <img data-role="flat-img" src={page?.src} alt={page?.alt ?? ''} hidden={!page} />
@@ -31,7 +41,6 @@ const isAlbum = detail?.kind === 'album';
     <div class="detail-head">
       <p class="hud-label" data-role="kind">{isAlbum ? 'ALBUM' : 'WORK'}</p>
       <button type="button" class="btn btn-ghost btn-sm detail-collapse" data-action="collapse" aria-expanded="true">たたむ</button>
-      <button type="button" class="btn btn-ghost btn-sm detail-close" data-action="close" aria-label="閉じる">✕</button>
     </div>
 
     <div class="detail-album" data-role="album" hidden={!isAlbum}>
@@ -52,10 +61,6 @@ const isAlbum = detail?.kind === 'album';
       </a>
     </p>
 
-    <div class="row detail-nav" data-role="nav" hidden={total < 2}>
-      <button type="button" class="btn btn-ghost btn-sm" data-action="prev">← 前のページ</button>
-      <button type="button" class="btn btn-ghost btn-sm" data-action="next">次のページ →</button>
-    </div>
     <p class="visually-hidden" aria-live="polite" data-role="live"></p>
   </aside>
 
@@ -68,16 +73,35 @@ const isAlbum = detail?.kind === 'album';
     inset: 0;
     z-index: 4;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+    /* 作品一覧の列（--rail-w）・絵・パネル */
+    grid-template-columns: var(--rail-w) minmax(0, 1fr) minmax(260px, 320px);
     background: var(--paper);
   }
   .detail[hidden] { display: none; }
   /* 3D のときは後ろの雑誌（キャンバス）を見せる */
   .detail[data-mode="3d"] { background: transparent; }
   /* 詳細中は「見せる」の計器表示とリンクを隠す */
-  .home-stage:has(.detail:not([hidden])) .showcase-hud,
-  .home-stage:has(.detail:not([hidden])) .showcase-hit,
-  .home-stage:has(.detail:not([hidden])) .home-heading { display: none; }
+  .home:has(.detail:not([hidden])) .showcase-hud,
+  .home:has(.detail:not([hidden])) .showcase-hit,
+  .home:has(.detail:not([hidden])) .home-heading { display: none; }
+  /* 詳細中は作品一覧を隠す（場所は詳細の操作の列が使う） */
+  .home:has(.detail:not([hidden])) > .rail { visibility: hidden; }
+
+  .detail-rail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    padding: 12px 8px;
+    border-right: 1px solid var(--line);
+    background: var(--paper);
+  }
+  .detail-back { width: 100%; justify-content: center; padding-inline: 0.25rem; }
+  .detail-pager { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+  .detail-pager[hidden] { display: none; }
+  .detail-pager .btn { width: 2.5rem; justify-content: center; }
+  .detail-rail-counter { font-size: 0.8rem; text-align: center; }
+  .detail-rail-total { display: block; color: var(--ink-muted); }
 
   .detail-view {
     position: relative;
@@ -141,10 +165,13 @@ const isAlbum = detail?.kind === 'album';
   .detail-title:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .detail-desc { white-space: pre-line; overflow-wrap: anywhere; font-size: 0.9rem; line-height: 1.7; }
   .detail-tags { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.35rem; }
-  .detail-nav { gap: 0.5rem; flex-wrap: wrap; }
 
   @media (max-width: 768px) {
-    .detail { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
+    .detail { grid-template-columns: minmax(0, 1fr); grid-template-rows: var(--rail-h) minmax(0, 1fr) auto; }
+    .detail-rail { flex-direction: row; justify-content: space-between; padding: 0 12px; border-right: none; border-bottom: 1px solid var(--line); }
+    .detail-back { width: auto; padding-inline: 0.75rem; }
+    .detail-pager { flex-direction: row; gap: 0.75rem; }
+    .detail-rail-total { display: inline; }
     .detail-panel { margin: 0 0.5rem 0.5rem; max-height: 42vh; max-height: 42dvh; align-self: end; padding: 0.75rem 1rem; }
     .detail-collapse { display: inline-flex; }
     .detail-panel[data-collapsed] .detail-more,

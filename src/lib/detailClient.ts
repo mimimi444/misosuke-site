@@ -76,6 +76,9 @@ function render() {
   role('album-desc').textContent = isAlbum ? data.description ?? '' : '';
   show(role('album-desc'), isAlbum && !!data.description);
   role('counter').textContent = `${pad(index + 1)} / ${pad(total)}`;
+  const railCounter = role('rail-counter');
+  railCounter.firstChild!.textContent = pad(index + 1);
+  railCounter.querySelector('.detail-rail-total')!.textContent = ` / ${pad(total)}`;
 
   role('title').textContent = page.title;
   role('date').textContent = page.date;
@@ -113,7 +116,9 @@ function render() {
 /** 詳細の絵の領域（パネルを除く）が、雑誌のキャンバス（詳細全体と同じ大きさ）の端から離れている量 */
 function currentInsets(): Insets {
   if (!els) return { top: 0, right: 0, bottom: 0, left: 0 };
-  const r = els.root.getBoundingClientRect(), v = els.view.getBoundingClientRect();
+  // 雑誌のキャンバス（作品一覧の列を除いた領域）の端からの距離
+  const canvas = document.querySelector<HTMLElement>('.showcase-canvas');
+  const r = (canvas ?? els.root).getBoundingClientRect(), v = els.view.getBoundingClientRect();
   return { top: v.top - r.top, right: r.right - v.right, bottom: r.bottom - v.bottom, left: v.left - r.left };
 }
 
