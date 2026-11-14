@@ -80,6 +80,13 @@ const fallbackHref = first?.href ?? '#';
   /* 計器風パネル（トップでは絵に重なってよい） */
   .showcase-hud { position: absolute; z-index: 2; pointer-events: none; margin: 0; }
   .showcase-now { top: 1rem; right: 1rem; min-width: 180px; max-width: 46%; }
+  /* スマホ: 「NOW OPEN」の枠を小さな 1 行にする */
+  @media (max-width: 768px) {
+    .showcase-now { top: 0.6rem; right: 0.6rem; min-width: 0; max-width: 70%; padding: 0.35rem 0.7rem; display: flex; align-items: baseline; gap: 0.5rem; }
+    .showcase-now .hud-label { font-size: 0.6rem; white-space: nowrap; }
+    .showcase-title { font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .showcase-turn { left: 0.6rem; bottom: 0.6rem; font-size: 0.6rem; }
+  }
   .showcase-title { font-weight: 700; overflow-wrap: anywhere; }
   .showcase-turn { left: 1rem; bottom: 1rem; }
 
