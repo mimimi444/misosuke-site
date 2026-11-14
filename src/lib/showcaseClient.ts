@@ -10,6 +10,15 @@ function hrefFor(show: Showcase, pageIndex: number): string {
   return page.href;
 }
 
+/** 雑誌のリンクの行き先。空なら押しても何も開かない。サイトの外は新しいタブで開く */
+function setHref(hit: HTMLAnchorElement, href: string) {
+  if (!href) { hit.removeAttribute('href'); return; }
+  hit.href = href;
+  const external = /^https?:\/\//.test(href) && new URL(href).origin !== location.origin;
+  if (external) { hit.target = '_blank'; hit.rel = 'noopener'; }
+  else { hit.removeAttribute('target'); hit.removeAttribute('rel'); }
+}
+
 const SWIPE_PX = 30;
 
 /** スマホ・タブレット: 雑誌の上の横スワイプでページをめくる（左へ＝次、右へ＝前）。スワイプしたときはリンクを開かない */
@@ -59,7 +68,7 @@ async function setup(root: HTMLElement) {
   };
   set('title', show.title);
   set('count', `${show.pages.length} PAGES`);
-  hit.href = hrefFor(show, 0);
+  setHref(hit, hrefFor(show, 0));
 
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   canvas.hidden = false;
@@ -70,7 +79,7 @@ async function setup(root: HTMLElement) {
       onState: ({ state, page, total, rightPageIndex }) => {
         set('state', state);
         set('turn', `${reducedMotion ? 'MANUAL' : 'AUTO TURN'} ・ ${String(page).padStart(2, '0')} / ${String(total).padStart(2, '0')}`);
-        hit.href = hrefFor(show, rightPageIndex);
+        setHref(hit, hrefFor(show, rightPageIndex));
       },
     });
     root.dataset.mode = '3d';

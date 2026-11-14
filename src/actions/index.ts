@@ -13,6 +13,8 @@ import { storeUploadedImage } from '../lib/imageStore';
 import { isAllowedUploadType } from '../lib/imageFiles';
 import { tagSlug } from '../lib/tags';
 import { albumSlug } from '../lib/albumSlug';
+import { pageProblems, parseFreePage } from '../lib/freePage/model';
+import { missingImageIds, saveFreePage } from '../lib/freePage/store';
 
 /**
  * カンマ区切りのタグ名を画像に結び付ける。タグがなければ作る。
@@ -211,6 +213,25 @@ export const server = {
           await db.insert(albumImages).values({ albumId: input.id, imageId: ids[i]!, sortOrder: i });
         }
       }
+    },
+  }),
+  /** トップの雑誌の最後のページ（フリーページ）を保存する。data はウィジェットの並びの JSON */
+  saveFreePage: defineAction({
+    input: z.object({ data: z.string().max(20000) }),
+    handler: async ({ data }) => {
+      let raw: unknown;
+      try {
+        raw = JSON.parse(data);
+      } catch {
+        throw new ActionError({ code: 'BAD_REQUEST', message: 'データの形が正しくありません' });
+      }
+      const page = parseFreePage(raw);
+      const problems = pageProblems(page);
+      const db = getDb(env.DB);
+      if ((await missingImageIds(db, page)).length > 0) problems.push('削除された画像が含まれています');
+      if (problems.length > 0) throw new ActionError({ code: 'BAD_REQUEST', message: problems.join('\n') });
+      await saveFreePage(db, page);
+      return { ok: true };
     },
   }),
 };

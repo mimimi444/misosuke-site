@@ -62,3 +62,10 @@ export const loginAttempts = sqliteTable('login_attempts', {
   // 古い記録の削除とサイト全体の件数で使う
   index('login_attempts_at').on(t.attemptedAt),
 ]);
+
+/** サイトの設定（キーごとに JSON を 1 つ）。free_page: トップの雑誌の最後のページ */
+export const settings = sqliteTable('settings', {
+  key: text('key').primaryKey(),
+  value: text('value').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});

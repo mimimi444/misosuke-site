@@ -39,6 +39,7 @@ const isUnderPath = (p: string) => isAt(p) || pathname.startsWith(adminHref(p) +
         <a href={adminHref('/upload')} class:list={['admin-sidebar-link', { active: isAt('/upload') }]}>アップロード</a>
         <a href={adminHref('/images')} class:list={['admin-sidebar-link', { active: isAt('/images') }]}>画像管理</a>
         <a href={adminHref('/albums')} class:list={['admin-sidebar-link', { active: isUnderPath('/albums') }]}>アルバム管理</a>
+        <a href={adminHref('/free-page')} class:list={['admin-sidebar-link', { active: isAt('/free-page') }]}>フリーページ</a>
         <form method="post" action={adminHref('/logout')} class="admin-logout">
           <button type="submit" class="btn btn-ghost btn-sm">ログアウト</button>
         </form>

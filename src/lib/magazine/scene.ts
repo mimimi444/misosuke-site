@@ -12,6 +12,8 @@ import { cycleLength, forwardEnd, leafProgress, manualTurn } from './schedule';
 import { buildLeaves, rightPageIndex as rightIndexOf } from './spread';
 import type { MagazinePage } from './spread';
 import { fitDistance, imageRect, nextPageIndex, type Insets, type Zoom } from './reading';
+import type { FreePageView } from '../freePage/model';
+import { drawFreePage, RENDER_H, RENDER_W } from '../freePage/render';
 
 export type ShowcaseState = { state: 'TURNING' | 'HOLDING' | 'RIFFLE'; page: number; total: number; rightPageIndex: number };
 
@@ -87,6 +89,27 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
   });
 }
 
+/** フリーページを canvas に描く（画像と文字の読み込みを待ってから） */
+async function renderFreePage(view: FreePageView): Promise<HTMLCanvasElement> {
+  const c = document.createElement('canvas');
+  c.width = RENDER_W;
+  c.height = RENDER_H;
+  const imgs = new Map<string, HTMLImageElement>();
+  await Promise.all([
+    ...view.widgets.map(async (w) => {
+      if (w.type !== 'image' || !w.src) return;
+      const img = await loadImage(w.src);
+      if (img) imgs.set(w.imageId, img);
+    }),
+    document.fonts?.load('700 48px "Noto Sans JP"').catch(() => undefined),
+    document.fonts?.load('400 48px "Noto Sans JP"').catch(() => undefined),
+  ]);
+  drawFreePage(c.getContext('2d')!, view.widgets, imgs, {
+    ink: cssVar('--ink'), muted: cssVar('--ink-muted'), accent: cssVar('--accent'), line: cssVar('--line-strong'),
+  });
+  return c;
+}
+
 /** 紙の裏から透けて見える絵の濃さ */
 const GHOST_ALPHA = 0.22;
 
@@ -95,7 +118,7 @@ const GHOST_ALPHA = 0.22;
  * ghost では、表の絵が紙の裏から透けて見えるように薄く描く（裏面に貼ると左右反転して見える）。
  */
 function paperTexture(
-  img: HTMLImageElement | null, ghost: boolean, colors: { sheet: string; ink: string; speck: string }, scale = 1,
+  img: HTMLImageElement | HTMLCanvasElement | null, ghost: boolean, colors: { sheet: string; ink: string; speck: string }, scale = 1,
 ): THREE.CanvasTexture {
   const c = document.createElement('canvas');
   c.width = Math.round(900 * scale);
@@ -109,7 +132,7 @@ function paperTexture(
   if (img) {
     // 余白の中に、本来の縦横比で収める
     const m = 70 * scale, box = { width: c.width - m * 2, height: c.height - m * 2 - 90 * scale };
-    const r = imageRect({ width: img.naturalWidth, height: img.naturalHeight }, box);
+    const r = imageRect(img instanceof HTMLImageElement ? { width: img.naturalWidth, height: img.naturalHeight } : { width: img.width, height: img.height }, box);
     g.globalAlpha = ghost ? GHOST_ALPHA : 1;
     g.drawImage(img, m + r.x, m + r.y, r.width, r.height);
     g.globalAlpha = 1;
@@ -246,7 +269,7 @@ function disposeMaterial(m: THREE.Material, keep?: THREE.Texture) {
 
 export async function createShowcaseScene(
   canvas: HTMLCanvasElement,
-  opts: { pages: MagazinePage[]; reducedMotion: boolean; onState?: (s: ShowcaseState) => void },
+  opts: { pages: (MagazinePage & { free?: FreePageView })[]; reducedMotion: boolean; onState?: (s: ShowcaseState) => void },
 ): Promise<ShowcaseApi> {
   const colors: Colors = {
     paper: cssVar('--paper'), sheet: cssVar('--sheet'), ink: cssVar('--sheet-ink'), speck: cssVar('--sheet-speck'),
@@ -298,7 +321,8 @@ export async function createShowcaseScene(
   const showGroup = new THREE.Group();
   magazine.add(showGroup);
   const leaves = buildLeaves(opts.pages);
-  const images = await Promise.all(opts.pages.map((p) => loadImage(p.src)));
+  // フリーページは、管理画面のプレビューと同じ描き方で紙に描く
+  const images = await Promise.all(opts.pages.map((p) => (p.free ? renderFreePage(p.free) : loadImage(p.src))));
   /** 見せる紙の表と裏のテクスチャ（読むモードへ移るとき、見えていたページをめくる紙に使う） */
   const showMaps: { front: THREE.Texture; back: THREE.Texture }[] = [];
   const leafGeos = leaves.map((leaf, i) => {

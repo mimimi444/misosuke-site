@@ -19,7 +19,7 @@ const fallbackHref = first?.href ?? '#';
     <>
       <div class="showcase-flat" aria-hidden="false">
         <span class="showcase-flat-blank" aria-hidden="true"></span>
-        {firstPage && <img src={firstPage.src} alt={firstPage.title} />}
+        {firstPage?.src && <img src={firstPage.src} alt={firstPage.title} />}
       </div>
       <canvas class="showcase-canvas" hidden aria-label={`${fallback.title} のページがめくれる様子`}></canvas>
       <a class="showcase-hit" href={fallbackHref} aria-label={`${fallback.title} を見る`}></a>

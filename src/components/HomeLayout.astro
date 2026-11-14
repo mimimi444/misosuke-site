@@ -6,6 +6,7 @@ import DetailPanel from './DetailPanel.astro';
 import type { DetailData } from '../lib/detail';
 import type { RailItem } from '../lib/rail';
 import { showcaseFromRail } from '../lib/showcase';
+import type { FreePageView } from '../lib/freePage/model';
 
 interface Props {
   items: RailItem[];
@@ -13,12 +14,14 @@ interface Props {
   /** タグページの見出し（例: #春） */
   heading?: string;
   tag?: string;
+  /** トップの雑誌の最後のページ（タグページでは出さない） */
+  free?: FreePageView | null;
   /** 作品詳細を開いた状態で返すとき */
   detail?: DetailData | null;
 }
-const { items, nextCursor, heading, tag, detail = null } = Astro.props;
-// 雑誌は作品一覧の先頭から、同じ並び順で
-const showcase = showcaseFromRail(items);
+const { items, nextCursor, heading, tag, free = null, detail = null } = Astro.props;
+// 雑誌は作品一覧の先頭から同じ並び順で、最後にフリーページ
+const showcase = showcaseFromRail(items, free);
 ---
 
 <div class="home">

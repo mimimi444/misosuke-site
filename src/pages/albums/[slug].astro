@@ -35,7 +35,7 @@ const description = detail?.description ?? detail?.pages[detail.startIndex]?.des
 
 <BaseLayout title={detail?.title ?? '見つかりません'} description={description.slice(0, 120)}>
   {home && detail ? (
-    <HomeLayout items={home.items} nextCursor={home.nextCursor} detail={detail} />
+    <HomeLayout items={home.items} nextCursor={home.nextCursor} free={home.free} detail={detail} />
   ) : (
     <div class="empty detail-missing">
       <p>{detail ? 'このアルバムにはまだ画像がありません。' : 'アルバムが見つかりません。'}</p>

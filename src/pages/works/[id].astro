@@ -16,7 +16,7 @@ const home = detail ? await loadHome(db) : null;
 
 <BaseLayout title={detail?.title ?? '見つかりません'} description={(detail?.description ?? '').slice(0, 120)}>
   {home && detail ? (
-    <HomeLayout items={home.items} nextCursor={home.nextCursor} detail={detail} />
+    <HomeLayout items={home.items} nextCursor={home.nextCursor} free={home.free} detail={detail} />
   ) : (
     <div class="empty work-missing">
       <p>作品が見つかりません。</p>

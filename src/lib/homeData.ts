@@ -2,8 +2,9 @@
 import { loadRailPage } from './rail';
 import { RAIL_PAGE_SIZE } from '../pages/api/rail';
 import type { getDb } from '../db/client';
+import { loadFreePageView } from './freePage/store';
 
 export async function loadHome(db: ReturnType<typeof getDb>) {
-  const rail = await loadRailPage(db, { limit: RAIL_PAGE_SIZE });
-  return { items: rail.items, nextCursor: rail.nextCursor };
+  const [rail, free] = await Promise.all([loadRailPage(db, { limit: RAIL_PAGE_SIZE }), loadFreePageView(db)]);
+  return { items: rail.items, nextCursor: rail.nextCursor, free };
 }
