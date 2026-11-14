@@ -30,7 +30,6 @@ const fallbackHref = first?.href ?? '#';
         <p class="hud-label" data-role="count">{fallback.pages.length} PAGES</p>
       </div>
       <p class="showcase-hud showcase-turn hud-label" data-role="turn">AUTO TURN ・ 01 / {String(fallback.pages.length).padStart(2, '0')}</p>
-      <p class="showcase-hud showcase-state state-label" data-role="state">HOLDING</p>
 
       <script type="application/json" data-role="showcase" set:html={JSON.stringify(fallback).replace(/</g, '\\u003c')}></script>
     </>
@@ -74,7 +73,6 @@ const fallbackHref = first?.href ?? '#';
   .showcase-now { top: 1rem; right: 1rem; min-width: 180px; max-width: 46%; }
   .showcase-title { font-weight: 700; overflow-wrap: anywhere; }
   .showcase-turn { left: 1rem; bottom: 1rem; }
-  .showcase-state { right: 1.25rem; bottom: 0.75rem; }
 
   .showcase-empty { margin: 2rem; }
 </style>

@@ -438,9 +438,10 @@ export async function createShowcaseScene(
   const bokehUniforms = bokeh.uniforms as Record<string, { value: number }>;
 
   let viewW = 1, viewH = 1;
+  let sized = false;
   const resize = () => {
     const w = canvas.clientWidth, h = canvas.clientHeight;
-    if (w === 0 || h === 0) return;
+    if (w === 0 || h === 0 || (w === viewW && h === viewH)) return;
     viewW = w;
     viewH = h;
     renderer.setSize(w, h, false);
@@ -448,6 +449,9 @@ export async function createShowcaseScene(
     camera.aspect = w / h;
     camera.setFocalLength(FOCAL_MM);
     camera.updateProjectionMatrix();
+    // 大きさを変えると描いた絵が消えるので、次のフレームを待たずにすぐ描き直す（空白のコマでちらつかないように）
+    if (sized) composer.render();
+    sized = true;
   };
   const observer = new ResizeObserver(resize);
   observer.observe(canvas);
@@ -477,16 +481,39 @@ export async function createShowcaseScene(
   };
 
   /** アルバムの絵の列を作る。絵の大きさは紙面の絵の枠に収まる大きさ（縦横比はデータの幅・高さから） */
-  const buildGallery = (pages: ReadPage[], start: number, time: number): Gallery => {
+  /** 紙面の絵の枠に、本来の縦横比で収めた大きさ */
+  const fitImageBox = (aspect: number) => {
     const boxW = PAPER.width * IMAGE_BOX_W, boxH = PAPER.height * IMAGE_BOX_H;
+    const h = Math.min(boxW / aspect, boxH);
+    return { w: h * aspect, h };
+  };
+
+  /** 絵の大きさが分かったら、その絵の板を本来の縦横比にし、列を並べ直す（表示中の絵が中央に来るように） */
+  const resizeGalleryItem = (b: ReadBook, g: Gallery, it: GalleryItem, aspect: number) => {
+    const { w, h } = fitImageBox(aspect);
+    if (Math.abs(w - it.w) < 1e-4 && Math.abs(h - (it.mesh.geometry.parameters.height ?? h)) < 1e-4) return;
+    it.mesh.geometry.dispose();
+    it.veil.geometry.dispose();
+    it.mesh.geometry = new THREE.PlaneGeometry(w, h);
+    it.veil.geometry = new THREE.PlaneGeometry(w, h);
+    it.w = w;
+    let c = 0;
+    g.items.forEach((x, i) => {
+      if (i > 0) c += g.items[i - 1]!.w / 2 + GALLERY_GAP + x.w / 2;
+      x.c = c;
+    });
+    g.from = g.to = g.items[b.current]!.c;
+  };
+
+  const buildGallery = (pages: ReadPage[], start: number, time: number): Gallery => {
     const group = new THREE.Group();
     group.position.z = PAPER.height * IMAGE_BOX_CENTER;
     const items: GalleryItem[] = [];
     let c = 0;
     pages.forEach((p, i) => {
+      // 幅・高さが記録されていなければ仮に 3:4。絵を読み込んだら本来の縦横比に直す（resizeGalleryItem）
       const aspect = p.width && p.height ? p.width / p.height : 3 / 4;
-      const scale = Math.min(boxW / aspect, boxH);
-      const w = scale * aspect, h = scale;
+      const { w, h } = fitImageBox(aspect);
       if (i > 0) c += items[i - 1]!.w / 2 + GALLERY_GAP + w / 2;
       // 紙と同じく、照明の切り替えに合わせて本来の色へ移る材質
       const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), paperMat({ color: colors.sheet, side: THREE.FrontSide, transparent: true, roughness: 1 }));
@@ -509,6 +536,7 @@ export async function createShowcaseScene(
         void loadImage(it.src).then((img) => {
           if (b.disposed || it.tex !== 'loading') return;
           if (!img) { it.tex = 'none'; return; }
+          if (img.naturalWidth > 0 && img.naturalHeight > 0) resizeGalleryItem(b, g, it, img.naturalWidth / img.naturalHeight);
           setPaperMap(it.mesh.material, imageTexture(img));
           it.mesh.material.color.set(0xffffff);
           it.mesh.material.emissive.set(0xffffff);
