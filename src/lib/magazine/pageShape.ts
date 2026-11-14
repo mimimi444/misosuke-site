@@ -38,8 +38,12 @@ export function leafOffsets(i: number, leafCount: number): { offRight: number; o
  * p はめくりの進み（0 = 右、1 = 左）。外側ほど遅れてついてくる（空気と重さでしなる）。
  * 間隔は縦ではなく紙の面に垂直な方向に取り、右の束では表が上、左の束では裏が上なので向きを反転する。
  * めくっている途中は束から air だけ浮かせる。flutter は空気でわずかに波打つ量。
+ * flatten（0〜1）は寝ている紙のしなり（立ち上がり・垂れ）を消す割合。1 で寝ている紙は水平（読むモード）。
+ * めくり途中の外側の遅れ（lag）と flutter は残るので、平らでもめくるときはしなる。
  */
-export function shapePage(out: Float32Array, p: number, offRight: number, offLeft: number, air: number, flutter: number): void {
+export function shapePage(
+  out: Float32Array, p: number, offRight: number, offLeft: number, air: number, flutter: number, flatten = 0,
+): void {
   const { width: W, height: H, segU, segV, lag } = PAPER;
   const du = W / segU;
   for (let j = 0; j <= segV; j++) {
@@ -50,7 +54,7 @@ export function shapePage(out: Float32Array, p: number, offRight: number, offLef
       const s = i * du, f = s / W;
       const ps = Math.min(1, Math.max(0, p * (1 + lag) - lag * f));
       const eps = ps * ps * (3 - 2 * ps);
-      const aR = restAngle(s) - edge * 0.06 * f;
+      const aR = (restAngle(s) - edge * 0.06 * f) * (1 - flatten);
       const aL = Math.PI - aR;
       const a = aR + (aL - aR) * eps + flutter * Math.sin(Math.PI * eps) * Math.sin(f * Math.PI);
       if (i > 0) { x += Math.cos(a) * du; y += Math.sin(a) * du; }

@@ -35,7 +35,7 @@ async function setup(root: HTMLElement) {
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   canvas.hidden = false;
   try {
-    await createShowcaseScene(canvas, {
+    const api = await createShowcaseScene(canvas, {
       pages: show.pages,
       reducedMotion,
       onState: ({ state, page, total, rightPageIndex }) => {
@@ -45,6 +45,8 @@ async function setup(root: HTMLElement) {
       },
     });
     root.dataset.mode = '3d';
+    // 開発中だけ、開発者ツールから読むモードを試せるようにする（Task 5 で詳細に組み込むまで）
+    if (import.meta.env.DEV) (window as unknown as { __showcase?: typeof api }).__showcase = api;
   } catch (e) {
     console.error('3D の雑誌を表示できなかったので平面表示にする', e);
     canvas.hidden = true;

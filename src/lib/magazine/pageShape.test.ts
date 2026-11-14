@@ -73,3 +73,38 @@ describe('紙の重なり', () => {
     }
   });
 });
+
+describe('読むモードの平らな紙', () => {
+  const flat = (p: number, off: number) => {
+    const out = new Float32Array(N * 3);
+    shapePage(out, p, off, off, 0, 0, 1);
+    return out;
+  };
+
+  test('flatten=1 の右の紙は、どの頂点も同じ高さ（水平）で、幅は紙の幅', () => {
+    const out = flat(0, 0.05);
+    for (let j = 0; j <= PAPER.segV; j++) for (let i = 0; i <= PAPER.segU; i++) expect(out[idx(i, j) + 1]).toBeCloseTo(0.05, 6);
+    expect(out[idx(PAPER.segU, 0)]).toBeCloseTo(PAPER.width, 6);
+  });
+
+  test('flatten=1 の左の紙も水平で、背から左へ伸びる', () => {
+    const out = flat(1, 0.03);
+    for (let i = 0; i <= PAPER.segU; i++) expect(out[idx(i, 2) + 1]).toBeCloseTo(0.03, 6);
+    expect(out[idx(PAPER.segU, 2)]).toBeCloseTo(-PAPER.width, 6);
+  });
+
+  test('flatten=0 は従来どおり', () => {
+    const a = shape(0.4, 0.02, 0.03, 0.05, 0.1);
+    const b = new Float32Array(N * 3);
+    shapePage(b, 0.4, 0.02, 0.03, 0.05, 0.1, 0);
+    expect(Array.from(b)).toEqual(Array.from(a));
+  });
+
+  test('平らでも、めくり途中の紙は外側が遅れてしなる', () => {
+    const out = new Float32Array(N * 3);
+    shapePage(out, 0.5, 0, 0, 0, 0, 1);
+    const mid = Math.floor(PAPER.segV / 2);
+    // 外側の端は背の真上より手前（まだ右側に残っている）
+    expect(out[idx(PAPER.segU, mid)]!).toBeGreaterThan(out[idx(0, mid)]!);
+  });
+});
