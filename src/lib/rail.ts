@@ -4,13 +4,13 @@ import type { getDb } from '../db/client';
 import { albumImages, albums, images, imageTags, tags } from '../db/schema';
 import { railHref } from './links';
 import { albumHref } from './albumSlug';
-import { loadImageAlbums, type ImageAlbum } from './feedAlbums';
+import { loadAlbumsOfImages, type ImageAlbum } from './feedAlbums';
 import { thumbSrc } from './imageFiles';
 import { r2Url } from './r2url';
 import { altText, displayTitle, formatPostedDate } from './workMeta';
 
 export type RailItem = {
-  /** 1 枚もの（1 ページだけのアルバムの絵を含む）か、2 ページ以上のアルバムの束か */
+  /** アルバムに入っていない 1 枚ものか、アルバム（1 ページだけのものを含む）の束か */
   kind: 'work' | 'album';
   id: string;
   thumb: string;
@@ -68,22 +68,22 @@ const newer = (a: { createdAt: string; id: string }, b: { createdAt: string; id:
   a.createdAt > b.createdAt || (a.createdAt === b.createdAt && a.id > b.id);
 
 /**
- * 画像の行を一覧の項目にする。2 ページ以上のアルバムの絵は、絞り込みに当たる一番新しいページの位置に
+ * 画像の行を一覧の項目にする。アルバム（1 ページだけのものを含む）の絵は、絞り込みに当たる一番新しいページの位置に
  * アルバムの束として 1 つだけ出し、それ以外のページは出さない（読み足しの続きでも同じ規則なので重ならない）。
+ * 1 枚の画像が複数のアルバムに入っていれば、それぞれのアルバムの束を出す。
  * 束の表は、一覧では表紙（無ければ 1 ページ目）で 1 ページ目から開き、タグページではそのタグの付いたページで、そのページから開く。
  */
 export function buildRailItems(
   rows: RailRow[],
-  albumOf: Map<string, ImageAlbum>,
+  albumsOf: Map<string, ImageAlbum[]>,
   albumInfo: Map<string, AlbumInfo>,
   opts: { tagged: boolean },
 ): RailItem[] {
   const items: RailItem[] = [];
   const seen = new Set<string>();
   for (const r of rows) {
-    const album = albumOf.get(r.id) ?? null;
-    const info = album ? albumInfo.get(album.slug) : undefined;
-    if (!album || !info || info.pages.length < 2) {
+    const albumList = (albumsOf.get(r.id) ?? []).filter((a) => (albumInfo.get(a.slug)?.pages.length ?? 0) > 0);
+    if (albumList.length === 0) {
       items.push({
         kind: 'work',
         id: r.id,
@@ -95,31 +95,34 @@ export function buildRailItems(
         title: displayTitle(r.title),
         date: formatPostedDate(r.createdAt),
         tags: r.tagList ? r.tagList.split('\u001f') : [],
-        albumTitle: album?.title ?? null,
-        href: railHref(r.id, album),
+        albumTitle: null,
+        href: railHref(r.id, null),
         alt: altText(r),
       });
       continue;
     }
-    const rep = info.pages.filter((p) => p.matches).reduce<AlbumInfo['pages'][number] | null>((best, p) => (!best || newer(p, best) ? p : best), null);
-    if (!rep || rep.id !== r.id || seen.has(info.slug)) continue;
-    seen.add(info.slug);
-    const top = opts.tagged ? rep : info.pages.find((p) => p.id === info.coverId) ?? info.pages[0]!;
-    items.push({
-      kind: 'album',
-      id: r.id,
-      thumb: top.thumb,
-      pageId: top.id,
-      src: top.src,
-      stack: info.pages.filter((p) => p.id !== top.id).slice(0, STACK_BEHIND).map((p) => p.thumb),
-      pageCount: info.pages.length,
-      title: info.title,
-      date: formatPostedDate(rep.createdAt),
-      tags: [],
-      albumTitle: null,
-      href: opts.tagged ? railHref(rep.id, { slug: info.slug, page: rep.page }) : albumHref(info.slug),
-      alt: `アルバム「${info.title}」（${info.pages.length}ページ）`,
-    });
+    for (const album of albumList) {
+      const info = albumInfo.get(album.slug)!;
+      const rep = info.pages.filter((p) => p.matches).reduce<AlbumInfo['pages'][number] | null>((best, p) => (!best || newer(p, best) ? p : best), null);
+      if (!rep || rep.id !== r.id || seen.has(info.slug)) continue;
+      seen.add(info.slug);
+      const top = opts.tagged ? rep : info.pages.find((p) => p.id === info.coverId) ?? info.pages[0]!;
+      items.push({
+        kind: 'album',
+        id: r.id,
+        thumb: top.thumb,
+        pageId: top.id,
+        src: top.src,
+        stack: info.pages.filter((p) => p.id !== top.id).slice(0, STACK_BEHIND).map((p) => p.thumb),
+        pageCount: info.pages.length,
+        title: info.title,
+        date: formatPostedDate(rep.createdAt),
+        tags: [],
+        albumTitle: null,
+        href: opts.tagged ? railHref(rep.id, { slug: info.slug, page: rep.page }) : albumHref(info.slug),
+        alt: `アルバム「${info.title}」（${info.pages.length}ページ）`,
+      });
+    }
   }
   return items;
 }
@@ -188,8 +191,8 @@ export async function loadRailPage(
     .limit(opts.limit + 1);
 
   const page = rows.slice(0, opts.limit);
-  const albumsById = await loadImageAlbums(db, page.map((r) => r.id));
-  const albumInfo = await loadAlbumInfo(db, [...new Set([...albumsById.values()].map((a) => a.slug))], opts.tagSlug);
+  const albumsById = await loadAlbumsOfImages(db, page.map((r) => r.id));
+  const albumInfo = await loadAlbumInfo(db, [...new Set([...albumsById.values()].flat().map((a) => a.slug))], opts.tagSlug);
   const items = buildRailItems(page, albumsById, albumInfo, { tagged: !!opts.tagSlug });
   const last = page[page.length - 1];
   return { items, nextCursor: rows.length > opts.limit && last ? encodeCursor({ createdAt: last.createdAt, id: last.id }) : null };

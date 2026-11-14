@@ -32,9 +32,9 @@ describe('作品一覧: アルバムを 1 つの束にまとめる', () => {
   // アルバム A: a1(古い) a2 a3(新しい)。単品 w は a3 と a1 の間
   const rows = [row('a3', '2026-11-03T00:00:00.000Z'), row('w', '2026-11-02T12:00:00.000Z', { tagList: '春' }), row('a2', '2026-11-02T00:00:00.000Z'), row('a1', '2026-11-01T00:00:00.000Z')];
   const albumOf = new Map([
-    ['a1', { slug: 'A', title: 'アルバムA', page: 1 }],
-    ['a2', { slug: 'A', title: 'アルバムA', page: 2 }],
-    ['a3', { slug: 'A', title: 'アルバムA', page: 3 }],
+    ['a1', [{ slug: 'A', title: 'アルバムA', page: 1 }]],
+    ['a2', [{ slug: 'A', title: 'アルバムA', page: 2 }]],
+    ['a3', [{ slug: 'A', title: 'アルバムA', page: 3 }]],
   ]);
   const info = (matches: [boolean, boolean, boolean] = [true, true, true], coverId: string | null = null): Map<string, AlbumInfo> =>
     new Map([['A', {
@@ -80,5 +80,21 @@ describe('作品一覧: アルバムを 1 つの束にまとめる', () => {
   test('続きの読み足しで、すでに束を出したアルバムの古い絵は出さない', () => {
     const next = buildRailItems([row('a1', '2026-11-01T00:00:00.000Z')], albumOf, info(), { tagged: false });
     expect(next).toEqual([]);
+  });
+
+  test('1 ページだけのアルバムも、ページ数 1 の束として出す', () => {
+    const one = new Map<string, AlbumInfo>([['S', { slug: 'S', title: 'ひとつ', coverId: null, pages: [page('s1', 1, '2026-11-05T00:00:00.000Z')] }]]);
+    const items = buildRailItems([row('s1', '2026-11-05T00:00:00.000Z')], new Map([['s1', [{ slug: 'S', title: 'ひとつ', page: 1 }]]]), one, { tagged: false });
+    expect(items[0]).toMatchObject({ kind: 'album', pageCount: 1, stack: [], href: '/albums/S', thumb: '/th/s1' });
+  });
+
+  test('複数のアルバムに入っている画像は、それぞれのアルバムの束として出す', () => {
+    const infos = new Map<string, AlbumInfo>([
+      ['A', info().get('A')!],
+      ['T', { slug: 'T', title: 'テスト', coverId: null, pages: [page('a1', 1, '2026-11-01T00:00:00.000Z')] }],
+    ]);
+    const albumsOf = new Map([...albumOf, ['a1', [{ slug: 'A', title: 'アルバムA', page: 1 }, { slug: 'T', title: 'テスト', page: 1 }]]]);
+    const items = buildRailItems(rows, albumsOf, infos, { tagged: false });
+    expect(items.map((i) => [i.kind, i.title])).toEqual([['album', 'アルバムA'], ['work', 't-w'], ['album', 'テスト']]);
   });
 });
