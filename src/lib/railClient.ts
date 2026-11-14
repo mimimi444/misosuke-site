@@ -74,14 +74,34 @@ function cellHtml(item: RailItem): HTMLLIElement {
   a.dataset.date = item.date;
   a.dataset.tags = JSON.stringify(item.tags);
   a.dataset.album = item.albumTitle ?? '';
-  const img = document.createElement('img');
-  img.src = item.thumb;
-  img.alt = item.alt;
-  img.loading = 'lazy';
-  img.decoding = 'async';
-  img.width = 400;
-  img.height = 400;
-  a.appendChild(img);
+  a.dataset.kind = item.kind;
+  a.dataset.pages = String(item.pageCount);
+  const image = (src: string, alt: string, className: string) => {
+    const img = document.createElement('img');
+    img.className = className;
+    img.src = src;
+    img.alt = alt;
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    img.width = 400;
+    img.height = 400;
+    return img;
+  };
+  // Rail.astro と同じ構造: 奥のページから先に置き、表の絵、ページ数の順
+  item.stack.map((src, i) => ({ src, depth: i + 1 })).reverse().forEach(({ src, depth }) => {
+    const sheet = image(src, '', 'rail-sheet');
+    sheet.dataset.depth = String(depth);
+    sheet.setAttribute('aria-hidden', 'true');
+    a.appendChild(sheet);
+  });
+  a.appendChild(image(item.thumb, item.alt, 'rail-cover'));
+  if (item.kind === 'album') {
+    const badge = document.createElement('span');
+    badge.className = 'rail-badge';
+    badge.setAttribute('aria-hidden', 'true');
+    badge.textContent = String(item.pageCount);
+    a.appendChild(badge);
+  }
   li.appendChild(a);
   return li;
 }
@@ -128,7 +148,8 @@ function showPop(s: State, a: HTMLAnchorElement) {
     }),
   );
   const album = a.dataset.album;
-  pop.querySelector('.rail-pop-album')!.textContent = album ? `アルバム: ${album}` : '';
+  pop.querySelector('.rail-pop-album')!.textContent =
+    a.dataset.kind === 'album' ? `アルバム・${a.dataset.pages ?? ''}ページ` : album ? `アルバム: ${album}` : '';
   (pop.querySelector('.rail-pop-open') as HTMLAnchorElement).href = a.href;
   pop.hidden = false;
 

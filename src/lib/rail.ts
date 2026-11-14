@@ -1,15 +1,21 @@
 // 作品一覧（レール）のデータ。新しい順に、カーソルで続きを読み足す。
-import { and, desc, eq, exists, lt, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, exists, inArray, lt, or, sql } from 'drizzle-orm';
 import type { getDb } from '../db/client';
-import { images, imageTags, tags } from '../db/schema';
+import { albumImages, albums, images, imageTags, tags } from '../db/schema';
 import { railHref } from './links';
-import { loadImageAlbums } from './feedAlbums';
+import { albumHref } from './albumSlug';
+import { loadImageAlbums, type ImageAlbum } from './feedAlbums';
 import { thumbSrc } from './imageFiles';
 import { altText, displayTitle, formatPostedDate } from './workMeta';
 
 export type RailItem = {
+  /** 1 枚もの（1 ページだけのアルバムの絵を含む）か、2 ページ以上のアルバムの束か */
+  kind: 'work' | 'album';
   id: string;
   thumb: string;
+  /** 束の後ろに重ねるページのサムネイル（最大 2 枚）。1 枚ものは空 */
+  stack: string[];
+  pageCount: number;
   title: string;
   date: string;
   tags: string[];
@@ -30,6 +36,114 @@ export function encodeCursor(c: Cursor): string {
 export function decodeCursor(raw: string): Cursor | null {
   const m = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z)\|([A-Za-z0-9_-]{1,64})$/.exec(raw);
   return m ? { createdAt: m[1]!, id: m[2]! } : null;
+}
+
+/** 一覧の 1 行（画像） */
+export type RailRow = {
+  id: string;
+  title: string | null;
+  description: string | null;
+  r2Key: string;
+  thumbR2Key: string | null;
+  createdAt: string;
+  tagList: string | null;
+};
+
+/** アルバムの全ページ（並び順）。matches はタグページの絞り込みに当たるか（絞り込みが無ければ常に true） */
+export type AlbumInfo = {
+  slug: string;
+  title: string;
+  coverId: string | null;
+  pages: { id: string; thumb: string; page: number; createdAt: string; matches: boolean }[];
+};
+
+/** 束の後ろに重ねる枚数 */
+const STACK_BEHIND = 2;
+
+const newer = (a: { createdAt: string; id: string }, b: { createdAt: string; id: string }) =>
+  a.createdAt > b.createdAt || (a.createdAt === b.createdAt && a.id > b.id);
+
+/**
+ * 画像の行を一覧の項目にする。2 ページ以上のアルバムの絵は、絞り込みに当たる一番新しいページの位置に
+ * アルバムの束として 1 つだけ出し、それ以外のページは出さない（読み足しの続きでも同じ規則なので重ならない）。
+ * 束の表は、一覧では表紙（無ければ 1 ページ目）で 1 ページ目から開き、タグページではそのタグの付いたページで、そのページから開く。
+ */
+export function buildRailItems(
+  rows: RailRow[],
+  albumOf: Map<string, ImageAlbum>,
+  albumInfo: Map<string, AlbumInfo>,
+  opts: { tagged: boolean },
+): RailItem[] {
+  const items: RailItem[] = [];
+  const seen = new Set<string>();
+  for (const r of rows) {
+    const album = albumOf.get(r.id) ?? null;
+    const info = album ? albumInfo.get(album.slug) : undefined;
+    if (!album || !info || info.pages.length < 2) {
+      items.push({
+        kind: 'work',
+        id: r.id,
+        thumb: thumbSrc(r),
+        stack: [],
+        pageCount: 1,
+        title: displayTitle(r.title),
+        date: formatPostedDate(r.createdAt),
+        tags: r.tagList ? r.tagList.split('\u001f') : [],
+        albumTitle: album?.title ?? null,
+        href: railHref(r.id, album),
+        alt: altText(r),
+      });
+      continue;
+    }
+    const rep = info.pages.filter((p) => p.matches).reduce<AlbumInfo['pages'][number] | null>((best, p) => (!best || newer(p, best) ? p : best), null);
+    if (!rep || rep.id !== r.id || seen.has(info.slug)) continue;
+    seen.add(info.slug);
+    const top = opts.tagged ? rep : info.pages.find((p) => p.id === info.coverId) ?? info.pages[0]!;
+    items.push({
+      kind: 'album',
+      id: r.id,
+      thumb: top.thumb,
+      stack: info.pages.filter((p) => p.id !== top.id).slice(0, STACK_BEHIND).map((p) => p.thumb),
+      pageCount: info.pages.length,
+      title: info.title,
+      date: formatPostedDate(rep.createdAt),
+      tags: [],
+      albumTitle: null,
+      href: opts.tagged ? railHref(rep.id, { slug: info.slug, page: rep.page }) : albumHref(info.slug),
+      alt: `アルバム「${info.title}」（${info.pages.length}ページ）`,
+    });
+  }
+  return items;
+}
+
+/** 一覧に出るアルバムの全ページ */
+async function loadAlbumInfo(db: ReturnType<typeof getDb>, slugs: string[], tagSlug?: string): Promise<Map<string, AlbumInfo>> {
+  const map = new Map<string, AlbumInfo>();
+  if (slugs.length === 0) return map;
+  const rows = await db
+    .select({
+      slug: albums.slug,
+      title: albums.title,
+      coverId: albums.coverImageId,
+      id: images.id,
+      r2Key: images.r2Key,
+      thumbR2Key: images.thumbR2Key,
+      createdAt: images.createdAt,
+      matches: tagSlug
+        ? sql<number>`exists(select 1 from image_tags it join tags t on t.id = it.tag_id where it.image_id = "images"."id" and t.slug = ${tagSlug})`
+        : sql<number>`1`,
+    })
+    .from(albumImages)
+    .innerJoin(albums, eq(albums.id, albumImages.albumId))
+    .innerJoin(images, eq(images.id, albumImages.imageId))
+    .where(inArray(albums.slug, slugs))
+    .orderBy(asc(albums.slug), asc(albumImages.sortOrder));
+  for (const r of rows) {
+    const info = map.get(r.slug) ?? { slug: r.slug, title: r.title, coverId: r.coverId, pages: [] };
+    info.pages.push({ id: r.id, thumb: thumbSrc(r), page: info.pages.length + 1, createdAt: r.createdAt, matches: !!r.matches });
+    map.set(r.slug, info);
+  }
+  return map;
 }
 
 export async function loadRailPage(
@@ -67,19 +181,8 @@ export async function loadRailPage(
 
   const page = rows.slice(0, opts.limit);
   const albumsById = await loadImageAlbums(db, page.map((r) => r.id));
-  const items = page.map((r): RailItem => {
-    const album = albumsById.get(r.id) ?? null;
-    return {
-      id: r.id,
-      thumb: thumbSrc(r),
-      title: displayTitle(r.title),
-      date: formatPostedDate(r.createdAt),
-      tags: r.tagList ? r.tagList.split('\u001f') : [],
-      albumTitle: album?.title ?? null,
-      href: railHref(r.id, album),
-      alt: altText(r),
-    };
-  });
+  const albumInfo = await loadAlbumInfo(db, [...new Set([...albumsById.values()].map((a) => a.slug))], opts.tagSlug);
+  const items = buildRailItems(page, albumsById, albumInfo, { tagged: !!opts.tagSlug });
   const last = page[page.length - 1];
   return { items, nextCursor: rows.length > opts.limit && last ? encodeCursor({ createdAt: last.createdAt, id: last.id }) : null };
 }

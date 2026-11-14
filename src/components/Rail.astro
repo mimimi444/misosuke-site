@@ -19,12 +19,19 @@ const { items, nextCursor, tag } = Astro.props;
           <a
             class="rail-item"
             href={item.href}
+            data-kind={item.kind}
+            data-pages={item.pageCount}
             data-title={item.title}
             data-date={item.date}
             data-tags={JSON.stringify(item.tags)}
             data-album={item.albumTitle ?? ''}
           >
-            <img src={item.thumb} alt={item.alt} loading="lazy" decoding="async" width="400" height="400" />
+            {/* アルバムは、後ろのページが少しずれて重なった束にする（奥のページから先に置く） */}
+            {item.stack.map((src, i) => ({ src, depth: i + 1 })).reverse().map(({ src, depth }) => (
+              <img class="rail-sheet" data-depth={depth} src={src} alt="" aria-hidden="true" loading="lazy" decoding="async" width="400" height="400" />
+            ))}
+            <img class="rail-cover" src={item.thumb} alt={item.alt} loading="lazy" decoding="async" width="400" height="400" />
+            {item.kind === 'album' && <span class="rail-badge" aria-hidden="true">{item.pageCount}</span>}
           </a>
         </li>
       ))}
@@ -56,6 +63,38 @@ const { items, nextCursor, tag } = Astro.props;
   }
   .rail-item img { width: 100%; height: 100%; aspect-ratio: 1; object-fit: cover; }
   .rail-item.is-active { transform: scale(1.35); box-shadow: var(--shadow-strong); position: relative; z-index: 2; }
+
+  /* アルバムの束: 表の絵の後ろに、残りのページが少しずつ傾いて重なる */
+  .rail-item[data-kind="album"] { position: relative; overflow: visible; border: none; background: transparent; }
+  .rail-item[data-kind="album"].is-active { box-shadow: none; }
+  .rail-item[data-kind="album"] .rail-cover,
+  .rail-sheet {
+    display: block;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-sm);
+    background: var(--panel-solid);
+  }
+  .rail-item[data-kind="album"] .rail-cover { position: relative; z-index: 1; box-shadow: var(--shadow); }
+  .rail-sheet { position: absolute; inset: 0; box-shadow: var(--shadow); transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .rail-sheet[data-depth="1"] { transform: translate(3px, -5px) rotate(5deg); }
+  .rail-sheet[data-depth="2"] { transform: translate(-3px, -4px) rotate(-5deg); }
+  /* 選んだときの拡大は控えめに（傾いた紙が列の外で切れないように） */
+  .rail-item[data-kind="album"].is-active { transform: scale(1.2); }
+  .rail-badge {
+    position: absolute;
+    right: -5px;
+    bottom: -5px;
+    z-index: 2;
+    min-width: 1.15rem;
+    padding: 0 0.3rem;
+    border-radius: var(--r-pill);
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    line-height: 1.15rem;
+    text-align: center;
+  }
   .rail-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   /* PC: 左の縦の列 */
@@ -95,7 +134,7 @@ const { items, nextCursor, tag } = Astro.props;
   }
   @media (prefers-reduced-motion: reduce) {
     .rail-pop { animation: none; }
-    .rail-item { transition: none; }
+    .rail-item, .rail-sheet { transition: none; }
   }
 </style>
 
