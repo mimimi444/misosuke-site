@@ -1,5 +1,5 @@
-import { test, expect } from 'vitest';
-import { leafProgress, cycleLength } from './schedule';
+import { describe, test, expect } from 'vitest';
+import { leafProgress, cycleLength, forwardEnd } from './schedule';
 
 const fwdEnd = 3 * 2.5 + 1.2;
 
@@ -30,4 +30,34 @@ test('時刻が 1 周を超えたら繰り返す', () => {
 
 test('紙が 0 枚でも壊れない', () => {
   expect(cycleLength(0)).toBeGreaterThan(0);
+});
+
+import { manualTurn } from './schedule';
+
+describe('手でめくる（スワイプ）', () => {
+  const n = 4;
+  test('次へ: 待ち時間は飛ばし、次の紙がめくり終わる時刻へ向かう', () => {
+    // 1 枚目がめくり終わった後の待ち時間（2.0 秒）
+    expect(manualTurn(2.0, n, 1)).toEqual({ jump: 2.5, target: 2.5 + 1.9 });
+  });
+  test('次へ: めくっている途中なら、その紙を最後までめくる', () => {
+    expect(manualTurn(3.0, n, 1)).toEqual({ jump: 3.0, target: 2.5 + 1.9 });
+  });
+  test('前へ: 最後にめくった紙を戻す', () => {
+    expect(manualTurn(2.0, n, -1)).toEqual({ jump: 1.9, target: 0 });
+  });
+  test('前へ: めくっている途中なら、その紙を戻す', () => {
+    expect(manualTurn(3.0, n, -1)).toEqual({ jump: 3.0, target: 2.5 });
+  });
+  test('前へ: 1 枚もめくっていなければ何もしない', () => {
+    expect(manualTurn(0.0, n, -1)).toBeNull();
+  });
+  test('周回の途中でも、その周回の中で計算する', () => {
+    const c = cycleLength(n);
+    expect(manualTurn(c + 2.0, n, 1)).toEqual({ jump: c + 2.5, target: c + 2.5 + 1.9 });
+  });
+  test('最後までめくった後の次へは、次の周回の 1 枚目をめくる', () => {
+    const c = cycleLength(n);
+    expect(manualTurn(forwardEnd(n) + 0.5, n, 1)).toEqual({ jump: forwardEnd(n) + 0.5, target: c + 1.9 });
+  });
 });

@@ -13,6 +13,36 @@ function hrefFor(show: Showcase, pageIndex: number): string {
   return show.pages[pageIndex]?.href ?? workPath(page.id);
 }
 
+const SWIPE_PX = 30;
+
+/** スマホ・タブレット: 雑誌の上の横スワイプでページをめくる（左へ＝次、右へ＝前）。スワイプしたときはリンクを開かない */
+function bindSwipe(root: HTMLElement, hit: HTMLAnchorElement, flip: (delta: 1 | -1) => void) {
+  let start: { x: number; y: number; id: number } | null = null;
+  let swiped = false;
+  root.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'touch') return;
+    start = { x: e.clientX, y: e.clientY, id: e.pointerId };
+    swiped = false;
+  });
+  root.addEventListener('pointerup', (e) => {
+    if (!start || e.pointerId !== start.id) return;
+    const dx = e.clientX - start.x, dy = e.clientY - start.y;
+    start = null;
+    if (Math.abs(dx) >= SWIPE_PX && Math.abs(dx) > Math.abs(dy)) {
+      swiped = true;
+      flip(dx < 0 ? 1 : -1);
+    }
+  });
+  root.addEventListener('pointercancel', () => { start = null; });
+  // スワイプの指を離したときに起きるクリックで、作品を開かない
+  hit.addEventListener('click', (e) => {
+    if (!swiped) return;
+    swiped = false;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  }, true);
+}
+
 async function setup(root: HTMLElement) {
   const json = root.querySelector<HTMLScriptElement>('[data-role="candidates"]');
   const canvas = root.querySelector<HTMLCanvasElement>('.showcase-canvas');
@@ -48,6 +78,7 @@ async function setup(root: HTMLElement) {
       },
     });
     root.dataset.mode = '3d';
+    bindSwipe(root, hit, (delta) => api.flip(delta));
     setStage(api);
   } catch (e) {
     console.error('3D の雑誌を表示できなかったので平面表示にする', e);

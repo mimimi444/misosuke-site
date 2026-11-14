@@ -8,7 +8,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { BokehPass } from 'three/addons/postprocessing/BokehPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { PAPER, leafOffsets, shapePage, vertexCount } from './pageShape';
-import { cycleLength, forwardEnd, leafProgress } from './schedule';
+import { cycleLength, forwardEnd, leafProgress, manualTurn } from './schedule';
 import { buildLeaves, rightPageIndex as rightIndexOf } from './spread';
 import type { MagazinePage } from './spread';
 import { fitDistance, imageRect, nextPageIndex, type Insets, type Zoom } from './reading';
@@ -28,6 +28,9 @@ const MOVE_SEC = 0.9;
 const TURN_SEC = 0.7;
 /** 見せるモードから読むモードへ移るとき、見えていたページをめくる時間（カメラの移動と同じ） */
 const PASS_SEC = MOVE_SEC;
+/** 手でめくる 1 枚の時間と、めくった後に自動めくりを止めておく時間（秒） */
+const MANUAL_TURN_SEC = 0.6;
+const MANUAL_HOLD_SEC = 4;
 /** 読むモードで紙の周りに残す余白（紙の大きさに対する割合） */
 const READ_MARGIN = 0.04;
 /** 読むモードの紙の束の厚みは、この枚数分までに抑える */
@@ -46,6 +49,8 @@ export type ShowcaseApi = {
   read(opts: { pages: ReadPage[]; startIndex: number; insets: Insets }): Promise<void>;
   /** 「見せる」モードに戻す */
   show(): void;
+  /** 見せるモードで手で 1 枚めくる（スワイプ）。1 = 次、-1 = 前 */
+  flip(delta: 1 | -1): void;
   /** 読むモードで 1 枚めくる */
   turn(delta: 1 | -1): void;
   /** 読むモードで、めくらずに index の絵を右ページに開く（準備中に送られたページに合わせる） */
@@ -524,6 +529,10 @@ export async function createShowcaseScene(
   let raf = 0, disposed = false, lastState = '';
   const clock = new THREE.Clock();
   let prevTime = 0;
+  /** 見せるモードの時間割の時刻（手でめくると実際の時刻からずれる） */
+  let showT = 0;
+  let manual: { target: number; rate: number } | null = null;
+  let holdUntil = 0;
   /** 見せるモードで右ページに見えている紙（leafGeos の番号。全部めくれていれば leafGeos.length） */
   let showRightLeaf = 0;
   /** 読むモードへ移るとき、見えていたページをめくる紙 */
@@ -549,6 +558,16 @@ export async function createShowcaseScene(
     const dt = Math.min(0.1, time - prevTime);
     prevTime = time;
 
+    // 見せるモードの時間割の時刻。手でめくったときは目標の時刻へ素早く進め（戻し）、その後しばらく自動で進めない
+    if (manual) {
+      const step = manual.rate * dt;
+      if (Math.abs(manual.target - showT) <= step) {
+        showT = manual.target;
+        manual = null;
+        holdUntil = time + MANUAL_HOLD_SEC;
+      } else showT += Math.sign(manual.target - showT) * step;
+    } else if (motion && time >= holdUntil && !book) showT += dt;
+
     // 見せる ⇄ 読む の進み
     const goal = mode === 'read' ? 1 : 0;
     blend = motion ? (goal > blend ? Math.min(goal, blend + dt / MOVE_SEC) : Math.max(goal, blend - dt / MOVE_SEC)) : goal;
@@ -571,14 +590,14 @@ export async function createShowcaseScene(
     if (!book) {
       let flipping = 0, done = 0;
       leafGeos.forEach((geo, i) => {
-        const p = motion ? leafProgress(i, time, n) : 0;
+        const p = leafProgress(i, showT, n);
         if (p > 0.02 && p < 0.98) flipping++;
         if (p >= 0.98) done++;
         const o = leafOffsets(i, n);
         updateShape(geo, p, o.offRight, o.offLeft, o.air, motion ? 0.18 * Math.sin(time * 2.4 + i) : 0);
       });
 
-      const local = time % cycleLength(n);
+      const local = showT % cycleLength(n);
       const state: ShowcaseState['state'] = motion && local > forwardEnd(n) ? 'RIFFLE' : flipping ? 'TURNING' : 'HOLDING';
       const rightPageIndex = rightIndexOf(done, opts.pages.length);
       showRightLeaf = done;
@@ -742,6 +761,14 @@ export async function createShowcaseScene(
       endPassing();
       mode = 'show';
       zoom = { scale: 1, x: 0, y: 0 };
+    },
+    flip(delta) {
+      if (book || leafGeos.length === 0) return;
+      const m = manualTurn(manual ? manual.target : showT, leafGeos.length, delta);
+      if (!m) return;
+      showT = m.jump;
+      if (!motion) { showT = m.target; manual = null; return; }
+      manual = { target: m.target, rate: Math.max(0.01, Math.abs(m.target - m.jump)) / MANUAL_TURN_SEC };
     },
     jumpTo(index) {
       const b = book;

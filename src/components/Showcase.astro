@@ -43,7 +43,8 @@ const fallbackHref = !fallback || !first ? '#' : fallback.kind === 'album' ? rai
 </section>
 
 <style is:global>
-  .showcase { position: relative; min-height: 0; min-width: 0; overflow: hidden; }
+  /* 横スワイプはページめくりに使うので、ブラウザには縦のスクロールとズームだけを任せる */
+  .showcase { position: relative; min-height: 0; min-width: 0; overflow: hidden; touch-action: pan-y pinch-zoom; }
   .showcase-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   .showcase-canvas[hidden] { display: none; }
 
