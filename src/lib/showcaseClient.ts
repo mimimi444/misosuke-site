@@ -8,7 +8,9 @@ import { setStage } from './stage';
 function hrefFor(show: Showcase, pageIndex: number): string {
   const page = show.pages[pageIndex];
   if (!page) return '#';
-  return show.kind === 'album' ? railHref(page.id, { slug: show.slug, page: pageIndex + 1 }) : workPath(page.id);
+  if (show.kind === 'album') return railHref(page.id, { slug: show.slug, page: pageIndex + 1 });
+  // 仮の雑誌: アルバムの表紙ならアルバム、1 枚ものなら作品
+  return show.pages[pageIndex]?.href ?? workPath(page.id);
 }
 
 async function setup(root: HTMLElement) {

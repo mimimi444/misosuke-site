@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest';
-import { pickShowcase, defaultShowcase, MAX_MAGAZINE_PAGES, type ShowcaseCandidates } from './showcase';
+import { pickShowcase, defaultShowcase, MAX_MAGAZINE_PAGES, type ShowcaseCandidates, type ShowcasePage } from './showcase';
 import type { MagazinePage } from './magazine/spread';
 
 const s = (i: number): MagazinePage => ({ id: `s${i}`, src: `/s${i}.webp`, title: `single ${i}` });
@@ -43,4 +43,16 @@ test('ページ数の多いアルバムは、先頭の 12 ページだけを雑�
   expect(MAX_MAGAZINE_PAGES).toBe(12);
   expect(pickShowcase({ albums: [big], singles: [] }, () => 0)!.pages.map((p) => p.id)).toEqual(big.pages.slice(0, 12).map((p) => p.id));
   expect(defaultShowcase({ albums: [big], singles: [] })!.pages).toHaveLength(12);
+});
+
+test('仮の雑誌には、アルバムの表紙（1 ページ目）も混ざり、押すとアルバムの 1 ページ目から開く', () => {
+  const picked = pickShowcase({ albums: [a1, a2], singles: [s(1)] }, () => 0.99)!;
+  expect(picked.kind).toBe('singles');
+  const ids = picked.pages.map((p) => p.id).sort();
+  expect(ids).toEqual(['a', 'c', 's1']);
+  const pages = picked.pages as ShowcasePage[];
+  const cover = pages.find((p) => p.id === 'a')!;
+  expect(cover.href).toBe('/albums/album-1');
+  expect(cover.title).toBe('アルバム1');
+  expect(pages.find((p) => p.id === 's1')!.href).toBeUndefined();
 });
