@@ -67,3 +67,20 @@ describe('手でめくる（スワイプ）', () => {
     expect(manualTurn(forwardEnd(n) + 0.5, n, 1)).toEqual({ jump: forwardEnd(n) + 0.5, target: c + 1.9 });
   });
 });
+
+import { openTime } from './schedule';
+
+describe('指定したページを開いた時刻', () => {
+  test('1 ページ目は最初、k ページ目は k-1 枚めくり終えた時刻', () => {
+    expect(openTime(0, 4)).toBe(0);
+    expect(openTime(2, 4)).toBeCloseTo(2.5 + 1.9);
+    for (let k = 0; k < 5; k++) {
+      const t = openTime(k, 4);
+      const flipped = [0, 1, 2, 3].filter((i) => leafProgress(i, t, 4) >= 0.999).length;
+      expect(flipped).toBe(k);
+    }
+  });
+  test('範囲外は最後のページ', () => {
+    expect(openTime(9, 4)).toBe(openTime(4, 4));
+  });
+});

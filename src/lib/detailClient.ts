@@ -7,6 +7,7 @@ import { PAPER } from './magazine/pageShape';
 import { albumHref } from './albumSlug';
 import { tagHref } from './tags';
 import { whenStage } from './stage';
+import { workPath } from './workMeta';
 
 /** 読むモードで紙の周りに残す余白（scene.ts の READ_MARGIN と同じ） */
 const READ_MARGIN = 0.04;
@@ -212,7 +213,12 @@ export function closeDetail(): void {
   resetZoom();
   els.root.hidden = true;
   delete els.root.dataset.mode;
-  api?.show();
+  // 雑誌は、見ていたページを開いた状態で戻す
+  const page = data?.pages[index];
+  const viewed = page && data
+    ? { id: page.id, src: page.src, href: data.kind === 'album' && data.album ? `${albumHref(data.album.slug)}?page=${index + 1}` : workPath(page.id) }
+    : undefined;
+  api?.show(viewed);
   data = null;
   document.title = listTitle;
   const back = returnFocus;

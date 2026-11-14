@@ -8,14 +8,24 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { BokehPass } from 'three/addons/postprocessing/BokehPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { PAPER, leafOffsets, shapePage, vertexCount } from './pageShape';
-import { cycleLength, flipCount, forwardEnd, leafProgress, manualTurn } from './schedule';
+import { cycleLength, flipCount, forwardEnd, leafProgress, manualTurn, openTime } from './schedule';
 import { buildLeaves, rightPageIndex as rightIndexOf } from './spread';
 import type { MagazinePage } from './spread';
 import { fitDistance, imageRect, nextPageIndex, type Insets, type Zoom } from './reading';
 import type { FreePageView } from '../freePage/model';
 import { drawFreePage, RENDER_H, RENDER_W } from '../freePage/render';
 
-export type ShowcaseState = { state: 'TURNING' | 'HOLDING' | 'RIFFLE'; page: number; total: number; rightPageIndex: number };
+export type ShowcaseState = {
+  state: 'TURNING' | 'HOLDING' | 'RIFFLE';
+  page: number;
+  total: number;
+  rightPageIndex: number;
+  /** 詳細から戻ったときに一番上にのせた紙（雑誌に無い作品）が見えている間、その作品の URL */
+  guestHref: string | null;
+};
+
+/** 詳細から戻るときに、雑誌で開いておく作品 */
+export type ViewedPage = { id: string; src: string; href: string };
 
 /** ユーザーが決めた構図: 注視点から見たカメラの相対位置、焦点距離、ぼけ */
 const VIEW_OFFSET = new THREE.Vector3(1.34, 2.89, 0.94);
@@ -33,6 +43,10 @@ const PASS_SEC = MOVE_SEC;
 /** 手でめくる 1 枚の時間と、めくった後に自動めくりを止めておく時間（秒） */
 const MANUAL_TURN_SEC = 0.6;
 const MANUAL_HOLD_SEC = 4;
+/** 詳細から戻ったときにのせた紙を見せておく時間と、めくる時間、めくった後に消える時間（秒） */
+const GUEST_HOLD_SEC = 2.5;
+const GUEST_FLIP_SEC = 1.6;
+const GUEST_FADE_SEC = 0.6;
 /** 読むモードで紙の周りに残す余白（紙の大きさに対する割合） */
 const READ_MARGIN = 0.04;
 /** 読むモードの紙の束の厚みは、この枚数分までに抑える */
@@ -50,7 +64,7 @@ export type ShowcaseApi = {
   /** 雑誌の中身を差し替え、カメラを正面へ移し、startIndex の絵を右ページに開く */
   read(opts: { pages: ReadPage[]; startIndex: number; insets: Insets }): Promise<void>;
   /** 「見せる」モードに戻す */
-  show(): void;
+  show(viewed?: ViewedPage): void;
   /** 見せるモードで手で 1 枚めくる（スワイプ）。1 = 次、-1 = 前 */
   flip(delta: 1 | -1): void;
   /** 読むモードで 1 枚めくる */
@@ -325,14 +339,20 @@ export async function createShowcaseScene(
   const images = await Promise.all(opts.pages.map((p) => (p.free ? renderFreePage(p.free) : loadImage(p.src))));
   /** 見せる紙の表と裏のテクスチャ（読むモードへ移るとき、見えていたページをめくる紙に使う） */
   const showMaps: { front: THREE.Texture; back: THREE.Texture }[] = [];
+  /** 見せる紙のメッシュ（表・裏）と、最後に計算しためくりの進み */
+  const showMeshes: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>[][] = [];
+  const showP: number[] = [];
   const leafGeos = leaves.map((leaf, i) => {
     const geo = pageGeometry();
     const img = images[i] ?? null;
     // 表は絵、裏は同じ絵の透け（裏面に貼るので左右反転して見える）
-    const front = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: paperTexture(img, false, colors), side: THREE.FrontSide, roughness: 0.92 }));
-    const back = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: paperTexture(img, true, colors), side: THREE.BackSide, roughness: 0.92 }));
+    // 読むモードへ移るとき、左に寝ている紙を薄くして消すので透明を許す
+    const front = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: paperTexture(img, false, colors), side: THREE.FrontSide, roughness: 0.92, transparent: true }));
+    const back = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: paperTexture(img, true, colors), side: THREE.BackSide, roughness: 0.92, transparent: true }));
     showGroup.add(front, back);
     showMaps.push({ front: front.material.map!, back: back.material.map! });
+    showMeshes.push([front, back]);
+    showP.push(0);
     return geo;
   });
 
@@ -561,6 +581,40 @@ export async function createShowcaseScene(
   let holdUntil = 0;
   /** 見せるモードで右ページに見えている紙（leafGeos の番号。全部めくれていれば leafGeos.length） */
   let showRightLeaf = 0;
+  let showFlipping = 0, showDone = 0;
+
+  /**
+   * 詳細から戻ったとき、雑誌に無い作品を見ていたら、その作品の紙を右ページの一番上にのせて見せ、少ししてからめくって消す。
+   * その間、雑誌の自動めくりは止めておく。
+   */
+  let guest: {
+    geo: THREE.BufferGeometry; group: THREE.Group; front: THREE.MeshStandardMaterial; back: THREE.MeshStandardMaterial;
+    href: string; flipAt: number; p: number;
+  } | null = null;
+  let guestToken = 0;
+  const disposeGuest = () => {
+    if (!guest) return;
+    magazine.remove(guest.group);
+    guest.geo.dispose();
+    guest.front.map?.dispose();
+    guest.back.map?.dispose();
+    guest.front.dispose();
+    guest.back.dispose();
+    guest = null;
+  };
+  const updateGuest = (time: number, visible: boolean) => {
+    const gst = guest!;
+    gst.group.visible = visible;
+    const u = motion ? (time - gst.flipAt) / GUEST_FLIP_SEC : 0;
+    gst.p = smooth(Math.min(1, Math.max(0, u)));
+    const top = leafOffsets(0, n).offRight + g * 2;
+    updateShape(gst.geo, gst.p, top, leafOffsets(n - 1, n).offLeft + g * 2, g * 6, motion ? 0.18 * Math.sin(Math.PI * gst.p) : 0);
+    // めくり終えたら薄くして消す
+    const fade = motion ? 1 - Math.min(1, Math.max(0, (time - gst.flipAt - GUEST_FLIP_SEC) / GUEST_FADE_SEC)) : 1;
+    gst.front.opacity = gst.back.opacity = fade;
+    if (fade <= 0) disposeGuest();
+  };
+
   /** 読むモードへ移るとき、見えていたページをめくる紙 */
   let passing: { geo: THREE.BufferGeometry; group: THREE.Group; front: THREE.MeshBasicMaterial; back: THREE.MeshBasicMaterial; start: number } | null = null;
   const endPassing = () => {
@@ -604,7 +658,13 @@ export async function createShowcaseScene(
       lastState = '';
     }
     const reading = !!book;
-    showGroup.visible = !reading;
+    // 読むモードへ移るとき: 右に寝ている紙はすぐ隠し（読む紙が重なる）、左に寝ている紙は薄くして消す。戻るときはその逆
+    showGroup.visible = !reading || e < 1;
+    showMeshes.forEach((pair, i) => {
+      const visible = !reading || showP[i]! > 0.5;
+      const opacity = reading ? 1 - e : 1;
+      for (const m of pair) { m.visible = visible; m.material.opacity = opacity; }
+    });
     const flatMats = reading;
     if ((coverR.material === coverInFlat) !== flatMats) {
       coverR.material = coverL.material = flatMats ? coverInFlat : coverInLit;
@@ -613,24 +673,34 @@ export async function createShowcaseScene(
     shapeCovers(e);
     const drift = motion ? 1 - e : 0;
 
-    if (!book) {
+    if (!book || mode === 'show') {
+      // 見せる紙（戻る途中も、左の紙を薄く出すので形を合わせておく）
       let flipping = 0, done = 0;
       leafGeos.forEach((geo, i) => {
         const p = i < flips ? leafProgress(i, showT, flips) : 0;
+        showP[i] = p;
         if (p > 0.02 && p < 0.98) flipping++;
         if (p >= 0.98) done++;
         const o = leafOffsets(i, n);
         updateShape(geo, p, o.offRight, o.offLeft, o.air, motion ? 0.18 * Math.sin(time * 2.4 + i) : 0);
       });
+      showFlipping = flipping;
+      showDone = done;
+    }
+    if (guest) updateGuest(time, !book);
+
+    if (!book) {
+      const flipping = showFlipping, done = showDone;
 
       const local = showT % cycleLength(flips);
       const state: ShowcaseState['state'] = motion && local > forwardEnd(flips) ? 'RIFFLE' : flipping ? 'TURNING' : 'HOLDING';
       const rightPageIndex = rightIndexOf(done, opts.pages.length);
       showRightLeaf = done;
-      const summary = `${state}|${done}`;
+      const guestHref = guest && guest.p < 0.5 ? guest.href : null;
+      const summary = `${state}|${done}|${guestHref ?? ''}`;
       if (summary !== lastState) {
         lastState = summary;
-        opts.onState?.({ state, page: rightPageIndex + 1, total: Math.max(opts.pages.length, 1), rightPageIndex });
+        opts.onState?.({ state, page: rightPageIndex + 1, total: Math.max(opts.pages.length, 1), rightPageIndex, guestHref });
       }
     } else {
       const b = book;
@@ -782,11 +852,36 @@ export async function createShowcaseScene(
       if (b.gallery) loadGalleryAround(b, b.gallery);
       else loadAround(b);
     },
-    show() {
+    show(viewed) {
       readToken++;
       endPassing();
+      disposeGuest();
+      const token = ++guestToken;
       mode = 'show';
       zoom = { scale: 1, x: 0, y: 0 };
+      if (!viewed) return;
+      const now = clock.getElapsedTime();
+      manual = null;
+      const index = opts.pages.findIndex((p) => p.id === viewed.id);
+      if (index >= 0) {
+        // 雑誌にある作品: そのページを開いたところで、しばらく止めておく
+        showT = openTime(index, flips);
+        holdUntil = now + MOVE_SEC + MANUAL_HOLD_SEC;
+        return;
+      }
+      // 雑誌に無い作品: その作品の紙を一番上にのせ、しばらく見せてからめくる
+      holdUntil = now + MOVE_SEC + GUEST_HOLD_SEC + GUEST_FLIP_SEC;
+      void loadImage(viewed.src).then((img) => {
+        if (disposed || token !== guestToken || !img) return;
+        const geo = pageGeometry();
+        const front = new THREE.MeshStandardMaterial({ map: paperTexture(img, false, colors), side: THREE.FrontSide, roughness: 0.92, transparent: true });
+        const back = new THREE.MeshStandardMaterial({ map: paperTexture(img, true, colors), side: THREE.BackSide, roughness: 0.92, transparent: true });
+        const group = new THREE.Group();
+        group.add(new THREE.Mesh(geo, front), new THREE.Mesh(geo, back));
+        magazine.add(group);
+        guest = { geo, group, front, back, href: viewed.href, flipAt: now + MOVE_SEC + GUEST_HOLD_SEC, p: 0 };
+        lastState = '';
+      });
     },
     flip(delta) {
       if (book || leafGeos.length === 0) return;
@@ -849,6 +944,7 @@ export async function createShowcaseScene(
     },
     dispose() {
       disposed = true;
+      disposeGuest();
       cancelAnimationFrame(raf);
       observer.disconnect();
       if (book) disposeBook(book);

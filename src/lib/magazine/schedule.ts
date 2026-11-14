@@ -64,3 +64,9 @@ export function manualTurn(t: number, leafCount: number, delta: 1 | -1): { jump:
   if (j < 0) return null;
   return { jump: base + Math.min(local, j * T_GAP + T_FLIP), target: base + j * T_GAP };
 }
+
+/** page ページ目（0 始まり）を右ページに開いて止まっている時刻（leafCount はめくる紙の枚数） */
+export function openTime(page: number, leafCount: number): number {
+  const k = Math.max(0, Math.min(page, leafCount));
+  return k === 0 ? 0 : (k - 1) * T_GAP + T_FLIP;
+}

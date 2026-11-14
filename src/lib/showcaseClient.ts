@@ -76,10 +76,11 @@ async function setup(root: HTMLElement) {
     const api = await createShowcaseScene(canvas, {
       pages: show.pages,
       reducedMotion,
-      onState: ({ state, page, total, rightPageIndex }) => {
+      onState: ({ state, page, total, rightPageIndex, guestHref }) => {
         set('state', state);
         set('turn', `${reducedMotion ? 'MANUAL' : 'AUTO TURN'} ・ ${String(page).padStart(2, '0')} / ${String(total).padStart(2, '0')}`);
-        setHref(hit, hrefFor(show, rightPageIndex));
+        // 詳細から戻ってのせた紙が見えている間は、その作品を開く
+        setHref(hit, guestHref ?? hrefFor(show, rightPageIndex));
       },
     });
     root.dataset.mode = '3d';
