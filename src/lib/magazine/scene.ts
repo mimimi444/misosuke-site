@@ -671,6 +671,7 @@ export async function createShowcaseScene(
   let raf = 0, disposed = false, lastState = '';
   const clock = new THREE.Clock();
   let prevTime = 0;
+  let cameraReady = false;
   /** 見せるモードの時間割の時刻（手でめくると実際の時刻からずれる） */
   let showT = 0;
   let manual: { target: number; rate: number } | null = null;
@@ -857,7 +858,9 @@ export async function createShowcaseScene(
     centroid.set(0, 0, 0);
     for (let k = 0; k < coverPos.count; k++) centroid.add(tmp.set(coverPos.getX(k), coverPos.getY(k), coverPos.getZ(k)));
     centroid.divideScalar(coverPos.count).applyMatrix4(magazine.matrixWorld);
-    smoothed.lerp(centroid, motion ? 0.05 : 1);
+    // 最初のコマはカメラを正しい位置に置く（決まった初期値から滑って寄って来ると、一瞬拡大して見える）
+    if (!cameraReady) { smoothed.copy(centroid); cameraReady = true; }
+    else smoothed.lerp(centroid, motion ? 0.05 : 1);
     showPos.copy(smoothed).add(VIEW_OFFSET);
     if (motion) { showPos.x += Math.sin(time * 0.31) * 0.01 * drift; showPos.y += Math.sin(time * 0.23) * 0.008 * drift; }
 
