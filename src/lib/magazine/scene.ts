@@ -40,6 +40,8 @@ const MOVE_SEC = 0.9;
 const TURN_SEC = 0.7;
 /** 見せるモードから読むモードへ移るとき、見えていたページをめくる時間（カメラの移動と同じ） */
 const PASS_SEC = MOVE_SEC;
+/** めくった紙が左に着いてから消えるまで（秒） */
+const PASS_FADE_SEC = 0.6;
 /** 手でめくる 1 枚の時間と、めくった後に自動めくりを止めておく時間（秒） */
 const MANUAL_TURN_SEC = 0.6;
 const MANUAL_HOLD_SEC = 4;
@@ -742,7 +744,10 @@ export async function createShowcaseScene(
       const count = book.leaves.length, k = Math.min(1, READ_STACK / Math.max(count, 1));
       const o = leafOffsets(0, count).offRight * k + 0.02;
       updateShape(passing.geo, smooth(u), o, o, g * 4, 0.18 * Math.sin(Math.PI * u), e, false);
-      if (u >= 1) endPassing();
+      // 左に着いたら、薄くして消す（いきなり消さない）
+      const fade = 1 - Math.min(1, Math.max(0, (time - passing.start - PASS_SEC) / PASS_FADE_SEC));
+      passing.front.opacity = passing.back.opacity = fade;
+      if (fade <= 0) endPassing();
     }
 
     // 見せる構図
@@ -840,8 +845,8 @@ export async function createShowcaseScene(
       if (fromShow) {
         const maps = showMaps[showRightLeaf];
         const geo = pageGeometry();
-        const front = new THREE.MeshBasicMaterial({ map: maps?.front ?? blankRead, side: THREE.FrontSide });
-        const back = new THREE.MeshBasicMaterial({ map: maps?.back ?? blankRead, side: THREE.BackSide });
+        const front = new THREE.MeshBasicMaterial({ map: maps?.front ?? blankRead, side: THREE.FrontSide, transparent: true });
+        const back = new THREE.MeshBasicMaterial({ map: maps?.back ?? blankRead, side: THREE.BackSide, transparent: true });
         const pg = new THREE.Group();
         pg.add(new THREE.Mesh(geo, front), new THREE.Mesh(geo, back));
         group.add(pg);
