@@ -1,10 +1,10 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import AlbumViewer from '../../components/AlbumViewer.astro';
 import { getDb } from '../../db/client';
 import { albums, albumImages } from '../../db/schema';
 import { eq, desc, sql } from 'drizzle-orm';
 import { r2Url } from '../../lib/r2url';
+import { albumHref } from '../../lib/albumSlug';
 import { env } from 'cloudflare:workers';
 
 type AlbumRow = typeof albums.$inferSelect & {
@@ -63,10 +63,7 @@ try {
               <h2 class="album-title">{album.title}</h2>
               {album.description && <p class="album-desc">{album.description}</p>}
               {album.imageCount > 0 && (
-                <button
-                  class="btn btn-primary open-viewer-btn"
-                  data-open-album={album.slug}
-                >開く</button>
+                <a class="btn btn-primary open-viewer-btn" href={albumHref(album.slug)} aria-label={`${album.title} を開く`}>開く</a>
               )}
             </div>
           </div>
@@ -74,8 +71,6 @@ try {
       </div>
     )}
   </div>
-
-  <AlbumViewer />
 </BaseLayout>
 
 <style>

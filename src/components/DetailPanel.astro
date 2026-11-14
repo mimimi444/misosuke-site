@@ -154,5 +154,7 @@ const isAlbum = detail?.kind === 'album';
 
 <script>
   import { initDetail } from '../lib/detailClient';
+  import { initDetailRouter } from '../lib/detailRouter';
+  initDetailRouter();
   initDetail();
 </script>

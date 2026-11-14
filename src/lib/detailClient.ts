@@ -364,9 +364,6 @@ export function initDetail(): void {
     applyZoom(zoom);
   }).observe(els.view);
 
-  // 開発中だけ、開発者ツールから開閉を試せるようにする
-  if (import.meta.env.DEV) (window as unknown as { __detail?: unknown }).__detail = { openDetail, closeDetail };
-
   // サーバーが詳細を開いた状態で返したとき
   const json = root.querySelector<HTMLScriptElement>('[data-role="detail-data"]');
   if (json && !root.hidden) {
