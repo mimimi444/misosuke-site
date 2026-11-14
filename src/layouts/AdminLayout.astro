@@ -5,7 +5,11 @@ interface Props {
   title?: string;
 }
 const { title = '管理画面' } = Astro.props;
-const pathname = Astro.url.pathname;
+import { adminHref } from '../lib/adminSession';
+import SiteHeader from '../components/SiteHeader.astro';
+const pathname = Astro.url.pathname.replace(/\/$/, '');
+const isAt = (p: string) => pathname === adminHref(p);
+const isUnderPath = (p: string) => isAt(p) || pathname.startsWith(adminHref(p) + '/');
 ---
 
 <!doctype html>
@@ -18,21 +22,12 @@ const pathname = Astro.url.pathname;
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@100..900&family=Palette+Mosaic&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@100..900&display=swap" rel="stylesheet" />
   </head>
   <body>
     <div class="grain"></div>
 
-    <header class="site-header">
-      <a href="/" class="site-logo">
-        <span class="logo-main">JJJ</span>
-        <span class="logo-sub">ジャンク<br class="sp_only">ジャーナル<br class="sp_only">ジャーニー</span>
-      </a>
-      <span class="admin-badge">管理画面</span>
-      <nav style="margin-left: auto;">
-        <a href="/" class="nav-link">← サイトへ戻る</a>
-      </nav>
-    </header>
+    <SiteHeader variant="admin" />
 
     <div class="admin-layout">
       <div class="admin-content">
@@ -40,23 +35,19 @@ const pathname = Astro.url.pathname;
       </div>
       
       <aside class="admin-sidebar">
-        <a href="/admin" class:list={['admin-sidebar-link', { active: pathname === '/admin' }]}>ダッシュボード</a>
-        <a href="/admin/upload" class:list={['admin-sidebar-link', { active: pathname === '/admin/upload' }]}>アップロード</a>
-        <a href="/admin/images" class:list={['admin-sidebar-link', { active: pathname === '/admin/images' }]}>画像管理</a>
-        <a href="/admin/albums" class:list={['admin-sidebar-link', { active: pathname.startsWith('/admin/albums') }]}>アルバム管理</a>
+        <a href={adminHref('')} class:list={['admin-sidebar-link', { active: isAt('') }]}>ダッシュボード</a>
+        <a href={adminHref('/upload')} class:list={['admin-sidebar-link', { active: isAt('/upload') }]}>アップロード</a>
+        <a href={adminHref('/images')} class:list={['admin-sidebar-link', { active: isAt('/images') }]}>画像管理</a>
+        <a href={adminHref('/albums')} class:list={['admin-sidebar-link', { active: isUnderPath('/albums') }]}>アルバム管理</a>
+        <a href={adminHref('/free-page')} class:list={['admin-sidebar-link', { active: isAt('/free-page') }]}>フリーページ</a>
+        <form method="post" action={adminHref('/logout')} class="admin-logout">
+          <button type="submit" class="btn btn-ghost btn-sm">ログアウト</button>
+        </form>
       </aside>
     </div>
   </body>
 </html>
 
 <style is:global>
-  .admin-badge {
-    font-size: 0.7rem;
-    color: var(--accent);
-    border: 1px solid rgba(255, 87, 20, 0.35);
-    padding: 0.2rem 0.5rem;
-    border-radius: 2px;
-    letter-spacing: 0.06em;
-    margin-left: 0.75rem;
-  }
+  .admin-logout { margin-top: 1.5rem; padding: 0 0.75rem; }
 </style>

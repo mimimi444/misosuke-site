@@ -1,10 +1,34 @@
-import { defineAction } from 'astro:actions';
+import { ActionError, defineAction } from 'astro:actions';
 import { z } from 'astro:schema';
 import { getDb } from '../db/client';
 import { images, tags, imageTags, albums, albumImages } from '../db/schema';
 import { nanoid } from 'nanoid';
 import { eq, inArray } from 'drizzle-orm';
 import { env } from 'cloudflare:workers';
+import { formBoolean } from '../lib/form';
+import { clampPostText, composePostText, resolvePostText, splitTagNames } from '../lib/social/compose';
+import { workPath } from '../lib/workMeta';
+import { publishImageToBluesky } from '../lib/social/publish';
+import { storeUploadedImage } from '../lib/imageStore';
+import { isAllowedUploadType } from '../lib/imageFiles';
+import { tagSlug } from '../lib/tags';
+import { albumSlug } from '../lib/albumSlug';
+import { pageProblems, parseFreePage } from '../lib/freePage/model';
+import { missingImageIds, saveFreePage } from '../lib/freePage/store';
+
+/**
+ * カンマ区切りのタグ名を画像に結び付ける。タグがなければ作る。
+ * slug は tagSlug() で作る（日本語のタグも別々の slug になる）。記号だけのタグ名は捨てる。
+ */
+async function attachTags(db: ReturnType<typeof getDb>, imageId: string, rawTagNames: string) {
+  for (const name of splitTagNames(rawTagNames)) {
+    const slug = tagSlug(name);
+    if (!slug) continue;
+    await db.insert(tags).values({ id: nanoid(), name, slug }).onConflictDoNothing();
+    const [tag] = await db.select().from(tags).where(eq(tags.slug, slug));
+    if (tag) await db.insert(imageTags).values({ imageId, tagId: tag.id }).onConflictDoNothing();
+  }
+}
 
 export const server = {
   uploadImage: defineAction({
@@ -14,39 +38,66 @@ export const server = {
       title: z.string().optional(),
       description: z.string().optional(),
       tagNames: z.string().optional(),
+      postToBluesky: formBoolean,
+      attachImage: formBoolean,
+      includeLink: formBoolean,
+      postText: z.string().optional(),
     }),
-    handler: async (input) => {
+    handler: async (input, context) => {
       const { DB, BUCKET } = env;
       const db = getDb(DB);
 
-      const id = nanoid();
-      const ext = input.file.name.split('.').pop() ?? 'jpg';
-      const now = new Date();
-      const r2Key = `images/${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${id}.${ext}`;
+      if (!isAllowedUploadType(input.file.type)) {
+        throw new ActionError({ code: 'BAD_REQUEST', message: `対応していない形式です: ${input.file.type || '不明'}` });
+      }
 
-      await BUCKET.put(r2Key, await input.file.arrayBuffer(), {
-        httpMetadata: { contentType: input.file.type },
-      });
+      const id = nanoid();
+      const now = new Date();
+      // 元画像はそのまま保管し、公開用には圧縮したものを使う
+      const stored = await storeUploadedImage({ bucket: BUCKET, images: env.IMAGES, id, file: input.file, now });
 
       await db.insert(images).values({
         id,
         title: input.title || null,
         description: input.description || null,
-        r2Key,
+        r2Key: stored.r2Key,
+        originalR2Key: stored.originalR2Key,
+        thumbR2Key: stored.thumbR2Key,
+        width: stored.width,
+        height: stored.height,
         createdAt: now.toISOString(),
       });
 
-      if (input.tagNames) {
-        const names = input.tagNames.split(',').map(s => s.trim()).filter(Boolean);
-        for (const name of names) {
-          const slug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
-          const tagId = nanoid();
-          await db.insert(tags).values({ id: tagId, name, slug }).onConflictDoNothing();
-          const [tag] = await db.select().from(tags).where(eq(tags.slug, slug));
-          if (tag) {
-            await db.insert(imageTags).values({ imageId: id, tagId: tag.id }).onConflictDoNothing();
-          }
-        }
+      if (input.tagNames) await attachTags(db, id, input.tagNames);
+
+      if (input.postToBluesky) {
+        // 投稿のリンクは、この作品のページ（/works/<ID>）
+        const site = context.site?.href ?? '';
+        const edited = input.postText?.trim();
+        const text = edited
+          ? clampPostText(resolvePostText(edited, site, id))
+          : composePostText({
+              title: input.title,
+              description: input.description,
+              tagNames: splitTagNames(input.tagNames),
+              url: input.includeLink && site ? new URL(workPath(id), site).href : null,
+            });
+        // 投稿の完了は待たずに返す。失敗は bluesky_posts に記録される
+        context.locals.cfContext.waitUntil(
+          publishImageToBluesky({
+            db,
+            bucket: BUCKET,
+            images: env.IMAGES,
+            imageId: id,
+            text,
+            attachImage: input.attachImage,
+            altText: input.title ?? '',
+            env: {
+              identifier: env.BLUESKY_IDENTIFIER ?? '',
+              appPassword: env.BLUESKY_APP_PASSWORD ?? '',
+            },
+          }),
+        );
       }
 
       return { id };
@@ -62,7 +113,8 @@ export const server = {
       const [image] = await db.select().from(images).where(eq(images.id, input.id));
       if (!image) throw new Error('Image not found');
 
-      await BUCKET.delete(image.r2Key);
+      // 公開用と元画像（圧縮導入前の画像は同じキー）の両方を消す
+      await BUCKET.delete([...new Set([image.r2Key, image.originalR2Key ?? image.r2Key, ...(image.thumbR2Key ? [image.thumbR2Key] : [])])]);
       await db.delete(images).where(eq(images.id, input.id));
     },
   }),
@@ -85,16 +137,7 @@ export const server = {
 
       if (input.tagNames !== undefined) {
         await db.delete(imageTags).where(eq(imageTags.imageId, input.id));
-        const names = input.tagNames.split(',').map(s => s.trim()).filter(Boolean);
-        for (const name of names) {
-          const slug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
-          const tagId = nanoid();
-          await db.insert(tags).values({ id: tagId, name, slug }).onConflictDoNothing();
-          const [tag] = await db.select().from(tags).where(eq(tags.slug, slug));
-          if (tag) {
-            await db.insert(imageTags).values({ imageId: input.id, tagId: tag.id }).onConflictDoNothing();
-          }
-        }
+        await attachTags(db, input.id, input.tagNames);
       }
     },
   }),
@@ -111,7 +154,7 @@ export const server = {
       const db = getDb(DB);
 
       const id = nanoid();
-      const slug = input.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '') + '-' + id.slice(0, 6);
+      const slug = albumSlug(input.title, id);
 
       await db.insert(albums).values({
         id,
@@ -170,6 +213,25 @@ export const server = {
           await db.insert(albumImages).values({ albumId: input.id, imageId: ids[i]!, sortOrder: i });
         }
       }
+    },
+  }),
+  /** トップの雑誌の最後のページ（フリーページ）を保存する。data はウィジェットの並びの JSON */
+  saveFreePage: defineAction({
+    input: z.object({ data: z.string().max(20000) }),
+    handler: async ({ data }) => {
+      let raw: unknown;
+      try {
+        raw = JSON.parse(data);
+      } catch {
+        throw new ActionError({ code: 'BAD_REQUEST', message: 'データの形が正しくありません' });
+      }
+      const page = parseFreePage(raw);
+      const problems = pageProblems(page);
+      const db = getDb(env.DB);
+      if ((await missingImageIds(db, page)).length > 0) problems.push('削除された画像が含まれています');
+      if (problems.length > 0) throw new ActionError({ code: 'BAD_REQUEST', message: problems.join('\n') });
+      await saveFreePage(db, page);
+      return { ok: true };
     },
   }),
 };

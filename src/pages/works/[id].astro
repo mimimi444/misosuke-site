@@ -1,0 +1,29 @@
+---
+// 作品（画像 1 枚）の詳細: トップと同じ構成に、作品詳細を開いた状態で返す。
+// アルバム内の画像でも、その 1 枚を紙として表示し、所属アルバムへのリンクを添える。
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import HomeLayout from '../../components/HomeLayout.astro';
+import { getDb } from '../../db/client';
+import { env } from 'cloudflare:workers';
+import { loadDetail } from '../../lib/detailData';
+import { loadHome } from '../../lib/homeData';
+
+const db = getDb(env.DB);
+const detail = await loadDetail(db, { kind: 'work', id: Astro.params.id ?? '' });
+if (!detail) Astro.response.status = 404;
+const home = detail ? await loadHome(db) : null;
+---
+
+<BaseLayout title={detail?.title ?? '見つかりません'} description={(detail?.description ?? '').slice(0, 120)}>
+  {home && detail ? (
+    <HomeLayout items={home.items} nextCursor={home.nextCursor} free={home.free} detail={detail} />
+  ) : (
+    <div class="empty work-missing">
+      <p>作品が見つかりません。</p>
+    </div>
+  )}
+</BaseLayout>
+
+<style>
+  .work-missing { margin: 3rem clamp(1rem, 3vw, 2.5rem); }
+</style>

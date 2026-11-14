@@ -1,4 +1,6 @@
 ---
+import { albumHref } from '../../../lib/albumSlug';
+import { adminHref } from '../../../lib/adminSession';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { getDb } from '../../../db/client';
 import { images, imageTags, tags } from '../../../db/schema';
@@ -54,7 +56,7 @@ if (Astro.request.method === 'POST') {
   });
 
   if (data) {
-    return Astro.redirect(`/albums/${data.slug}`);
+    return Astro.redirect(albumHref(data.slug));
   }
   if (error) {
     formError = error.message ?? 'アルバムの作成に失敗しました';
@@ -69,8 +71,8 @@ function parseTagList(tagList: string | null): string[] {
 
 <AdminLayout title="アルバムを作成">
   <div class="new-album-header">
-    <a href="/admin/albums" class="back-link">← アルバム一覧</a>
-    <h2 class="admin-section-title">アルバムを作成</h2>
+    <a href={adminHref('/albums')} class="back-link">← アルバム一覧</a>
+    <h2 class="page-title">アルバムを作成</h2>
     {presetImageIds.length > 0 && (
       <p class="preset-notice">{presetImageIds.length} 枚の画像がプリセットされています</p>
     )}
@@ -91,7 +93,7 @@ function parseTagList(tagList: string | null): string[] {
     <input type="hidden" name="imageIds" id="imageIdsInput" value={presetImageIds.join(',')} />
     <input type="hidden" name="coverImageId" id="coverImageIdInput" />
 
-    <div class="image-picker-section">
+    <div class="card image-picker-section">
       <div class="picker-header">
         <h3 class="picker-title">画像を選択</h3>
         <span class="selected-count" id="selectedCount">
@@ -130,7 +132,7 @@ function parseTagList(tagList: string | null): string[] {
 
     <div class="form-submit">
       <button type="submit" class="btn btn-primary">アルバムを作成</button>
-      <a href="/admin/albums" class="btn btn-ghost">キャンセル</a>
+      <a href={adminHref('/albums')} class="btn btn-ghost">キャンセル</a>
     </div>
   </form>
 </AdminLayout>
@@ -142,20 +144,20 @@ function parseTagList(tagList: string | null): string[] {
     display: inline-block;
     margin-bottom: 0.75rem;
     font-size: 0.8rem;
-    color: var(--text-muted);
+    color: var(--ink-muted);
     text-decoration: none;
     transition: color 0.2s;
   }
   .back-link:hover { color: var(--accent); }
 
-  .admin-section-title { border-bottom: none; margin-bottom: 0.5rem; }
+  .page-title { margin-bottom: 0.5rem; }
 
   .preset-notice {
     font-size: 0.8rem;
     color: var(--accent);
     letter-spacing: 0.04em;
     padding: 0.375rem 0.75rem;
-    background: rgba(212, 168, 160, 0.1);
+    background: var(--accent-soft);
     border-left: 2px solid var(--accent);
     border-radius: 0 2px 2px 0;
     display: inline-block;
@@ -173,8 +175,8 @@ function parseTagList(tagList: string | null): string[] {
   }
 
   .image-picker-section {
-    border: 1px solid var(--border);
-    border-radius: 2px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-sm);
     overflow: hidden;
     margin-bottom: 1.5rem;
   }
@@ -184,14 +186,14 @@ function parseTagList(tagList: string | null): string[] {
     align-items: center;
     justify-content: space-between;
     padding: 0.875rem 1rem;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
+    background: var(--panel-solid);
+    border-bottom: 1px solid var(--line-strong);
   }
 
   .picker-title {
     font-size: 0.875rem;
     font-weight: 500;
-    color: var(--text);
+    color: var(--ink);
     letter-spacing: 0.04em;
   }
 
@@ -208,13 +210,13 @@ function parseTagList(tagList: string | null): string[] {
     padding: 1rem;
     max-height: 420px;
     overflow-y: auto;
-    background: var(--bg);
+    background: var(--paper);
   }
 
   .picker-card {
     position: relative;
     cursor: pointer;
-    border-radius: 2px;
+    border-radius: var(--r-sm);
     overflow: hidden;
     border: 2px solid transparent;
     transition: border-color 0.15s;
@@ -243,7 +245,7 @@ function parseTagList(tagList: string | null): string[] {
     width: 20px;
     height: 20px;
     background: var(--accent);
-    color: var(--bg);
+    color: var(--paper);
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -260,8 +262,8 @@ function parseTagList(tagList: string | null): string[] {
     display: block;
     padding: 0.25rem 0.375rem;
     font-size: 0.65rem;
-    color: var(--text-muted);
-    background: var(--surface);
+    color: var(--ink-muted);
+    background: var(--panel-solid);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -269,10 +271,10 @@ function parseTagList(tagList: string | null): string[] {
 
   .form-error {
     font-size: 0.85rem;
-    color: #c97070;
-    background: rgba(201, 112, 112, 0.1);
-    border: 1px solid rgba(201, 112, 112, 0.3);
-    border-radius: 2px;
+    color: var(--danger);
+    background: var(--danger-soft);
+    border: 1px solid var(--danger);
+    border-radius: var(--r-sm);
     padding: 0.625rem 0.875rem;
     margin-bottom: 1rem;
   }

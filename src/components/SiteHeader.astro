@@ -1,0 +1,35 @@
+---
+// 公開サイトと管理画面で共通のヘッダー。
+// 左: オレンジの JJJ ＋サイト名、右: ナビ（公開）または「サイトへ戻る」（管理画面）
+import { adminHref } from '../lib/adminSession';
+
+interface Props {
+  variant: 'public' | 'admin';
+  loggedIn?: boolean;
+}
+const { variant, loggedIn = false } = Astro.props;
+const pathname = Astro.url.pathname;
+// 作品詳細（/albums/<slug>・/works/<id>）はトップと同じ画面の上に開くので FEED を選んだ状態にする
+const onAlbumList = /^\/albums\/?$/.test(pathname);
+const onFeed = pathname === '/' || pathname.startsWith('/works/') || (pathname.startsWith('/albums/') && !onAlbumList);
+---
+
+<header class="site-header">
+  <a href="/" class="site-logo" aria-label="ジャンクジャーナルジャーニー トップへ">
+    <span class="site-logo-mark">JJJ</span>
+    <span class="site-logo-name">ジャンクジャーナルジャーニー</span>
+  </a>
+  {variant === 'admin' && <span class="hud-label site-header-badge">ADMIN</span>}
+
+  <nav class="site-nav" aria-label="サイト内">
+    {variant === 'public' ? (
+      <>
+        <a href="/" class:list={['nav-link', { active: onFeed }]}>FEED</a>
+        <a href="/albums" class:list={['nav-link', { active: onAlbumList }]}>ALBUMS</a>
+        {loggedIn && <a href={adminHref('')} class="nav-link nav-admin" rel="nofollow">管理画面</a>}
+      </>
+    ) : (
+      <a href="/" class="nav-link">← サイトへ戻る</a>
+    )}
+  </nav>
+</header>

@@ -28,3 +28,12 @@ pnpm-debug.log*
 
 # jetbrains setting folder
 .idea/
+
+# Cloudflare local secrets
+.dev.vars
+
+# wrangler local state
+.wrangler/
+
+# Playwright MCP output
+.playwright-mcp/

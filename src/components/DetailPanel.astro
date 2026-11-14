@@ -1,0 +1,187 @@
+---
+// 作品詳細: 雑誌の上に重ねる操作面と、絵に重ならない細いパネル（PC は右、スマホは下）。
+// サーバーで開いた状態（detail あり）でも、JavaScript 前に内容が読めるよう中身を書き出す。
+// ブラウザ側の表示の更新は detailClient.ts の render() が同じ構造に対して行う。
+import type { DetailData } from '../lib/detail';
+import { albumHref } from '../lib/albumSlug';
+import { tagHref } from '../lib/tags';
+
+interface Props {
+  detail?: DetailData | null;
+}
+const { detail = null } = Astro.props;
+const page = detail ? detail.pages[detail.startIndex] : undefined;
+const total = detail?.pages.length ?? 0;
+const pad = (n: number) => String(n).padStart(2, '0');
+const isAlbum = detail?.kind === 'album';
+---
+
+<div class="detail" role="dialog" aria-modal="true" aria-labelledby="detail-title" hidden={!detail}>
+  <!-- 詳細中は作品一覧を隠し、その場所に「一覧へ戻る」とページ送りを置く -->
+  <nav class="detail-rail" aria-label="作品の操作">
+    <button type="button" class="btn btn-ghost btn-sm detail-back" data-action="close" aria-label="一覧に戻る">← FEED</button>
+    <div class="detail-pager" data-role="nav" hidden={total < 2}>
+      <button type="button" class="btn btn-ghost btn-sm" data-action="prev" aria-label="前のページ">←</button>
+      <span class="mono-number detail-rail-counter" data-role="rail-counter">{pad((detail?.startIndex ?? 0) + 1)}<span class="detail-rail-total"> / {pad(total)}</span></span>
+      <button type="button" class="btn btn-ghost btn-sm" data-action="next" aria-label="次のページ">→</button>
+    </div>
+  </nav>
+
+  <div class="detail-view" data-role="view">
+    <div class="detail-flat" data-role="flat">
+      <img data-role="flat-img" src={page?.src} alt={page?.alt ?? ''} hidden={!page} />
+    </div>
+    <p class="detail-zoom panel hud-label" data-role="zoom" hidden>
+      <span data-role="zoom-value">2.0×</span>
+      <button type="button" class="btn btn-ghost btn-sm" data-action="unzoom">等倍に戻す</button>
+    </p>
+  </div>
+
+  <aside class="detail-panel panel" data-role="panel">
+    <div class="detail-head">
+      <p class="hud-label" data-role="kind">{isAlbum ? 'ALBUM' : 'WORK'}</p>
+      <button type="button" class="btn btn-ghost btn-sm detail-collapse" data-action="collapse" aria-expanded="true">たたむ</button>
+    </div>
+
+    <div class="detail-album" data-role="album" hidden={!isAlbum}>
+      <p class="detail-album-title" data-role="album-title">{isAlbum ? detail?.title : ''}</p>
+      <p class="detail-desc detail-more" data-role="album-desc" hidden={!(isAlbum && detail?.description)}>{isAlbum ? detail?.description : ''}</p>
+      <p class="mono-number detail-counter" data-role="counter">{pad((detail?.startIndex ?? 0) + 1)} / {pad(total)}</p>
+    </div>
+
+    <h2 class="detail-title" id="detail-title" tabindex="-1" data-role="title">{page?.title ?? ''}</h2>
+    <p class="hud-label detail-more" data-role="date">{page?.date ?? ''}</p>
+    <p class="detail-desc detail-more" data-role="desc" hidden={!page?.description}>{page?.description ?? ''}</p>
+    <ul class="detail-tags detail-more" data-role="tags" aria-label="タグ" hidden={!page || page.tags.length === 0}>
+      {page?.tags.map((t) => <li><a class="chip" href={tagHref(t)}>#{t}</a></li>)}
+    </ul>
+    <p class="detail-more" data-role="album-link" hidden={!(detail?.kind === 'work' && detail.album)}>
+      <a class="btn btn-ghost btn-sm" href={detail?.album ? albumHref(detail.album.slug) : '#'}>
+        アルバムで見る<span data-role="album-link-title">{detail?.album ? `：${detail.album.title}` : ''}</span>
+      </a>
+    </p>
+
+    <p class="visually-hidden" aria-live="polite" data-role="live"></p>
+  </aside>
+
+  {detail && <script type="application/json" data-role="detail-data" set:html={JSON.stringify(detail).replace(/</g, '\\u003c')}></script>}
+</div>
+
+<style is:global>
+  .detail {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    display: grid;
+    /* 作品一覧の列（--rail-w）・絵・パネル */
+    grid-template-columns: var(--rail-w) minmax(0, 1fr) minmax(260px, 320px);
+    background: var(--paper);
+  }
+  .detail[hidden] { display: none; }
+  /* 3D のときは後ろの雑誌（キャンバス）を見せる */
+  .detail[data-mode="3d"] { background: transparent; }
+  /* 詳細中は「見せる」の計器表示とリンクを隠す */
+  .home:has(.detail:not([hidden])) .showcase-hud,
+  .home:has(.detail:not([hidden])) .showcase-hit,
+  .home:has(.detail:not([hidden])) .home-heading { display: none; }
+  /* 詳細中は作品一覧を隠す（場所は詳細の操作の列が使う） */
+  .home:has(.detail:not([hidden])) > .rail { visibility: hidden; }
+
+  .detail-rail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    padding: 12px 8px;
+    border-right: 1px solid var(--line);
+    background: var(--paper);
+  }
+  .detail-back { width: 100%; justify-content: center; padding-inline: 0.25rem; }
+  .detail-pager { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+  .detail-pager[hidden] { display: none; }
+  .detail-pager .btn { width: 2.5rem; justify-content: center; }
+  .detail-rail-counter { font-size: 0.8rem; text-align: center; }
+  .detail-rail-total { display: block; color: var(--ink-muted); }
+
+  .detail-view {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    touch-action: none; /* 詳細の上ではブラウザのスクロール・ズームと衝突させない */
+    user-select: none;
+    -webkit-user-select: none;
+    cursor: default;
+  }
+  .detail[data-zoomed] .detail-view { cursor: grab; }
+
+  /* JavaScript 前・WebGL なしの平面表示 */
+  .detail-flat { position: absolute; inset: 0; display: grid; place-items: center; padding: 1.5rem; }
+  .detail-flat img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    background: var(--sheet);
+    padding: 1rem;
+    box-shadow: var(--shadow-strong);
+    transform-origin: center;
+    -webkit-user-drag: none;
+  }
+  .detail[data-mode="3d"] .detail-flat { display: none; }
+
+  .detail-zoom {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    margin: 0;
+    padding: 0.35rem 0.4rem 0.35rem 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .detail-zoom[hidden] { display: none; }
+
+  .detail-panel {
+    margin: 1rem 1rem 1rem 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    align-self: start;
+    max-height: calc(100% - 2rem);
+  }
+  /* 拡大中はパネルを隠す（絵に重ねない） */
+  .detail[data-zoomed] .detail-panel { visibility: hidden; }
+  .detail-panel p { margin: 0; }
+  .detail-panel [hidden] { display: none; }
+  .detail-head { display: flex; align-items: center; gap: 0.5rem; }
+  .detail-head .hud-label { margin-right: auto; }
+  .detail-collapse { display: none; }
+  .detail-album { display: flex; flex-direction: column; gap: 0.3rem; padding-bottom: 0.6rem; border-bottom: 1px solid var(--line); }
+  .detail-album-title { font-weight: 700; overflow-wrap: anywhere; }
+  .detail-counter { font-size: 0.85rem; }
+  .detail-title { margin: 0; font-size: 1.15rem; overflow-wrap: anywhere; }
+  .detail-title:focus { outline: none; }
+  .detail-title:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .detail-desc { white-space: pre-line; overflow-wrap: anywhere; font-size: 0.9rem; line-height: 1.7; }
+  .detail-tags { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.35rem; }
+
+  @media (max-width: 768px) {
+    .detail { grid-template-columns: minmax(0, 1fr); grid-template-rows: var(--rail-h) minmax(0, 1fr) auto; }
+    .detail-rail { flex-direction: row; justify-content: space-between; padding: 0 12px; border-right: none; border-bottom: 1px solid var(--line); }
+    .detail-back { width: auto; padding-inline: 0.75rem; }
+    .detail-pager { flex-direction: row; gap: 0.75rem; }
+    .detail-rail-total { display: inline; }
+    .detail-panel { margin: 0 0.5rem 0.5rem; max-height: 42vh; max-height: 42dvh; align-self: end; padding: 0.75rem 1rem; }
+    .detail-collapse { display: inline-flex; }
+    .detail-panel[data-collapsed] .detail-more,
+    .detail-panel[data-collapsed] .detail-album .detail-desc { display: none; }
+  }
+</style>
+
+<script>
+  import { initDetail } from '../lib/detailClient';
+  import { initDetailRouter } from '../lib/detailRouter';
+  initDetailRouter();
+  initDetail();
+</script>

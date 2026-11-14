@@ -12,27 +12,32 @@
     "astro": "astro",
     "generate-types": "wrangler types",
     "deploy": "astro build && wrangler deploy",
-    "cf:migrate": "wrangler d1 migrations apply misosuke-db --remote"
+    "cf:migrate": "wrangler d1 migrations apply misosuke-db --remote",
+    "test": "vitest run"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^13.5.4",
     "@astrojs/react": "^5.0.5",
+    "@atproto/api": "^0.30.3",
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
-    "@yui540/comimi": "^0.17.0",
     "astro": "^6.3.7",
     "drizzle-orm": "^0.45.2",
     "nanoid": "^5.1.11",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "wrangler": "^4.94.0"
+    "three": "^0.187.0",
+    "wrangler": "^4.94.0",
+    "zod": "^4.4.3"
   },
   "overrides": {
     "vite": "^7"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.9",
+    "@types/three": "^0.187.0",
     "drizzle-kit": "^0.31.10",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.3"
   }
 }

@@ -1,17 +1,28 @@
 import { useState, useRef, useCallback } from 'react';
+import { composePostText, countGraphemes, splitTagNames, placeholderWorkUrl, POST_MAX_GRAPHEMES } from '../lib/social/compose';
 
 interface FileItem {
   file: File;
   previewUrl: string;
   title: string;
+  description: string;
   tagNames: string;
+  postToBluesky: boolean;
+  attachImage: boolean;
+  includeLink: boolean;
+  postText: string;
+  /** 文面を手で編集したら true。以降はタイトルやタグに追従させない */
+  postTextEdited: boolean;
 }
 
 interface Props {
   tagSuggestions: string[];
+  siteUrl: string;
 }
 
-export default function UploadForm({ tagSuggestions }: Props) {
+type PostSetting = 'postToBluesky' | 'attachImage' | 'includeLink';
+
+export default function UploadForm({ tagSuggestions, siteUrl }: Props) {
   const [items, setItems] = useState<FileItem[]>([]);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
@@ -26,7 +37,13 @@ export default function UploadForm({ tagSuggestions }: Props) {
       file: f,
       previewUrl: URL.createObjectURL(f),
       title: '',
+      description: '',
       tagNames: '',
+      postToBluesky: false,
+      attachImage: true,
+      includeLink: true,
+      postText: '',
+      postTextEdited: false,
     }));
     setItems(prev => [...prev, ...newItems]);
   }, []);
@@ -51,8 +68,35 @@ export default function UploadForm({ tagSuggestions }: Props) {
     });
   };
 
-  const updateItem = (i: number, field: 'title' | 'tagNames', value: string) => {
-    setItems(prev => prev.map((item, idx) => idx === i ? { ...item, [field]: value } : item));
+  /** 手で編集していなければ、タイトル・タグ・リンク有無から文面を作り直す */
+  const withComposedText = (item: FileItem): FileItem => {
+    if (item.postTextEdited) return item;
+    return {
+      ...item,
+      postText: composePostText({
+        title: item.title,
+        description: item.description,
+        tagNames: splitTagNames(item.tagNames),
+        // 作品ページの URL は投稿時に決まるので、ここでは同じ長さの仮の URL を入れる
+        url: item.includeLink ? placeholderWorkUrl(siteUrl) : null,
+      }),
+    };
+  };
+
+  const updateItem = (i: number, field: 'title' | 'description' | 'tagNames', value: string) => {
+    setItems(prev => prev.map((item, idx) => idx === i ? withComposedText({ ...item, [field]: value }) : item));
+  };
+
+  const updateSetting = (i: number, field: PostSetting, value: boolean) => {
+    setItems(prev => prev.map((item, idx) => idx === i ? withComposedText({ ...item, [field]: value }) : item));
+  };
+
+  const resetPostText = (i: number) => {
+    setItems(prev => prev.map((item, idx) => idx === i ? withComposedText({ ...item, postTextEdited: false }) : item));
+  };
+
+  const updatePostText = (i: number, value: string) => {
+    setItems(prev => prev.map((item, idx) => idx === i ? { ...item, postText: value, postTextEdited: true } : item));
   };
 
   const handleSubmit = async () => {
@@ -65,11 +109,24 @@ export default function UploadForm({ tagSuggestions }: Props) {
       const fd = new FormData();
       fd.append('file', item.file);
       if (item.title) fd.append('title', item.title);
+      if (item.description) fd.append('description', item.description);
       if (item.tagNames) fd.append('tagNames', item.tagNames);
+      if (item.postToBluesky) {
+        fd.append('postToBluesky', 'true');
+        fd.append('attachImage', String(item.attachImage));
+        fd.append('includeLink', String(item.includeLink));
+        fd.append('postText', item.postText);
+      }
 
       const res = await fetch('/_actions/uploadImage', { method: 'POST', body: fd });
       if (!res.ok) {
-        setMessage(`エラー: ${item.file.name} のアップロードに失敗しました`);
+        setMessage(
+          res.status === 413
+            ? `エラー: ${item.file.name} はファイルサイズが大きすぎます（上限 25MB）`
+            : res.status === 400
+              ? `エラー: ${item.file.name} は対応していない形式です（JPG / PNG / WebP / GIF / AVIF / HEIC）`
+              : `エラー: ${item.file.name} のアップロードに失敗しました（${res.status}）`,
+        );
         setUploading(false);
         return;
       }
@@ -77,8 +134,9 @@ export default function UploadForm({ tagSuggestions }: Props) {
       setProgress({ done, total: items.length });
     }
 
-    setMessage(`${done} 枚のアップロードが完了しました`);
-    setTimeout(() => { window.location.href = '/admin/images'; }, 1200);
+    setMessage(`${done} 枚のアップロードが完了しました。フィードに移動します`);
+    // アップロードした画像が公開側でどう見えるかを確かめられるよう、フィードに移る
+    setTimeout(() => { window.location.href = '/'; }, 1200);
   };
 
   const handleClear = () => {
@@ -102,6 +160,7 @@ export default function UploadForm({ tagSuggestions }: Props) {
 
   return (
     <div className="upload-area">
+      {message && <p className="upload-message" role="alert">{message}</p>}
       <div
         className={`drop-zone${dragging ? ' drag-over' : ''}`}
         onClick={() => fileInputRef.current?.click()}
@@ -152,6 +211,16 @@ export default function UploadForm({ tagSuggestions }: Props) {
                     />
                   </div>
                   <div className="form-group">
+                    <label htmlFor={`description-${i}`}>作品説明</label>
+                    <textarea
+                      id={`description-${i}`}
+                      placeholder="（任意）作品について"
+                      rows={3}
+                      value={item.description}
+                      onChange={e => updateItem(i, 'description', e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
                     <label htmlFor={`tags-${i}`}>タグ（カンマ区切り）</label>
                     <input
                       id={`tags-${i}`}
@@ -162,6 +231,67 @@ export default function UploadForm({ tagSuggestions }: Props) {
                       list="tag-suggestions"
                     />
                   </div>
+                  <fieldset className="bluesky-settings">
+                    <label className="check">
+                      <input
+                        type="checkbox"
+                        checked={item.postToBluesky}
+                        onChange={e => updateSetting(i, 'postToBluesky', e.target.checked)}
+                      />
+                      Blueskyに投稿する
+                    </label>
+                    <div className="bluesky-options">
+                      <label className="check">
+                        <input
+                          type="checkbox"
+                          checked={item.attachImage}
+                          disabled={!item.postToBluesky}
+                          onChange={e => updateSetting(i, 'attachImage', e.target.checked)}
+                        />
+                        画像を添付
+                      </label>
+                      <label className="check">
+                        <input
+                          type="checkbox"
+                          checked={item.includeLink}
+                          // 手で編集した文面にはリンクの有無を反映できないので、操作させない
+                          disabled={!item.postToBluesky || item.postTextEdited}
+                          onChange={e => updateSetting(i, 'includeLink', e.target.checked)}
+                        />
+                        作品ページへのリンクを含める
+                      </label>
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor={`post-text-${i}`}>文面</label>
+                      <textarea
+                        id={`post-text-${i}`}
+                        value={item.postText}
+                        disabled={!item.postToBluesky}
+                        onChange={e => updatePostText(i, e.target.value)}
+                      />
+                      {item.postToBluesky && item.postTextEdited && (
+                        <p className="post-edited-note">
+                          文面を手で編集しています。リンクは文面の中で直接編集してください。
+                          <button type="button" className="btn-link" onClick={() => resetPostText(i)}>
+                            自動作成に戻す
+                          </button>
+                        </p>
+                      )}
+                      {(() => {
+                        const count = countGraphemes(item.postText);
+                        const over = count > POST_MAX_GRAPHEMES;
+                        return (
+                          <p className={`post-count${over ? ' over' : ''}`} aria-live="polite">
+                            {count} / {POST_MAX_GRAPHEMES}
+                            {over && '（超えた分は投稿時に切り詰めます）'}
+                          </p>
+                        );
+                      })()}
+                      {item.postToBluesky && item.includeLink && (
+                        <p className="post-edited-note">文面の URL（…/works/xxxx）は、投稿時にこの作品のページの URL に置き換わります。</p>
+                      )}
+                    </div>
+                  </fieldset>
                 </div>
               </div>
             ))}

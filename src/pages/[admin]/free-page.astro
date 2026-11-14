@@ -1,0 +1,106 @@
+---
+// トップの雑誌の最後のページ（フリーページ）の編集
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import FreePageEditor, { type PickableImage } from '../../components/FreePageEditor';
+import { getDb } from '../../db/client';
+import { images } from '../../db/schema';
+import { desc } from 'drizzle-orm';
+import { env } from 'cloudflare:workers';
+import { loadFreePage } from '../../lib/freePage/store';
+import { thumbSrc } from '../../lib/imageFiles';
+import { r2Url } from '../../lib/r2url';
+import { displayTitle } from '../../lib/workMeta';
+
+const db = getDb(env.DB);
+const [initial, rows] = await Promise.all([
+  loadFreePage(db),
+  db.select().from(images).orderBy(desc(images.createdAt)).limit(120),
+]);
+const pickable: PickableImage[] = rows.map((r) => ({ id: r.id, thumb: thumbSrc(r), src: r2Url(r.r2Key), title: displayTitle(r.title) }));
+---
+
+<AdminLayout title="フリーページ">
+  <h2 class="page-title">フリーページ <span class="hud-label">FREE PAGE</span></h2>
+  <p class="free-lead">トップの雑誌は最新 10 件の作品をめくり、最後にこのページを見せます。部品を上から積んで作ります。</p>
+  <FreePageEditor initial={initial} images={pickable} client:load />
+</AdminLayout>
+
+<style>
+  .free-lead { color: var(--ink-muted); font-size: 0.9rem; margin-bottom: 1rem; }
+
+  :global(.free-editor) {
+    display: grid;
+    grid-template-columns: 180px minmax(220px, 1fr) minmax(220px, 1fr) 300px;
+    gap: 1rem;
+    align-items: start;
+  }
+  @media (max-width: 1200px) {
+    :global(.free-editor) { grid-template-columns: 180px minmax(0, 1fr) 300px; }
+    :global(.free-inspector) { grid-column: 2; }
+    :global(.free-preview) { grid-column: 3; grid-row: 1 / span 2; }
+  }
+  @media (max-width: 760px) {
+    :global(.free-editor) { grid-template-columns: minmax(0, 1fr); }
+    :global(.free-inspector), :global(.free-preview) { grid-column: auto; grid-row: auto; }
+  }
+  :global(.free-editor .panel) { display: flex; flex-direction: column; gap: 0.6rem; }
+  :global(.free-hint) { font-size: 0.8rem; color: var(--ink-muted); }
+  :global(.free-palette .stack) { list-style: none; margin: 0; padding: 0; gap: 0.4rem; }
+  :global(.free-palette-item) { width: 100%; justify-content: space-between; cursor: grab; }
+
+  :global(.free-stack-head) { justify-content: space-between; }
+  :global(.free-meter) { height: 6px; border-radius: var(--r-pill); background: var(--line); overflow: hidden; }
+  :global(.free-meter span) { display: block; height: 100%; background: var(--accent); }
+  :global(.free-meter.is-over span) { background: var(--danger); }
+  :global(.free-list) { list-style: none; margin: 0; padding: 0; }
+  :global(.free-drop) { height: 10px; border-radius: var(--r-sm); transition: background 0.15s, height 0.15s; }
+  :global(.free-drop.is-over) { height: 28px; background: var(--accent-soft); outline: 1px dashed var(--accent); }
+  :global(.free-item) {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    background: var(--panel-solid);
+    padding: 0.35rem 0.4rem;
+    cursor: grab;
+  }
+  :global(.free-item.is-selected) { border-color: var(--accent); }
+  :global(.free-item.has-problem) { border-color: var(--danger); }
+  :global(.free-item-main) {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.1rem;
+    background: none;
+    border: none;
+    padding: 0.2rem;
+    text-align: left;
+    cursor: pointer;
+    color: var(--ink);
+    font: inherit;
+  }
+  :global(.free-item-summary) { font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+  :global(.free-item-tools) { display: flex; gap: 0.2rem; }
+
+  :global(.free-count) { font-size: 0.75rem; color: var(--ink-muted); }
+  :global(.free-problem) { color: var(--danger); font-size: 0.85rem; white-space: pre-line; }
+  :global(.free-saved) { color: var(--accent); font-size: 0.85rem; font-weight: 600; }
+  :global(.free-problems) { margin: 0; padding-left: 1.2rem; color: var(--danger); font-size: 0.8rem; }
+
+  :global(.free-images) { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 0.4rem; max-height: 360px; overflow-y: auto; }
+  :global(.free-image) { padding: 0; border: 2px solid transparent; border-radius: var(--r-sm); background: none; cursor: pointer; }
+  :global(.free-image.is-selected) { border-color: var(--accent); }
+  :global(.free-image img) { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--r-sm); }
+
+  /* プレビュー: 雑誌の紙と同じ余白（900 × 1200 の紙の中の 760 × 970 の枠） */
+  :global(.free-paper) {
+    background: var(--sheet);
+    box-shadow: var(--shadow);
+    aspect-ratio: 900 / 1200;
+    padding: 7.78% 7.78% 17.78%;
+  }
+  :global(.free-paper canvas) { display: block; width: 100%; height: auto; }
+</style>

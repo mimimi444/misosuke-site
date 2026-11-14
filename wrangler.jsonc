@@ -4,6 +4,8 @@
 		"global_fetch_strictly_public"
 	],
 	"name": "misosuke-site",
+	// 本番は gmail 側アカウント。別アカウントへの誤デプロイを防ぐため固定する
+	"account_id": "c6a3018a20d7abab33bb8e9ebfee20b6",
 	"main": "@astrojs/cloudflare/entrypoints/server",
 	"assets": {
 		"directory": "./dist",
@@ -25,5 +27,9 @@
 			"binding": "BUCKET",
 			"bucket_name": "misosuke-images"
 		}
-	]
+	],
+	// Bluesky 投稿前の画像リサイズに使う
+	"images": {
+		"binding": "IMAGES"
+	}
 }

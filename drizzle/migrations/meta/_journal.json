@@ -8,6 +8,41 @@
       "when": 1779528115670,
       "tag": "0000_needy_jack_flag",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1794039765761,
+      "tag": "0001_flippant_electro",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1794060867388,
+      "tag": "0002_lonely_whirlwind",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1794061732025,
+      "tag": "0003_omniscient_silverclaw",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1794150569121,
+      "tag": "0004_mighty_gideon",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1794657738220,
+      "tag": "0005_equal_layla_miller",
+      "breakpoints": true
     }
   ]
 }

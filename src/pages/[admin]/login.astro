@@ -1,0 +1,88 @@
+---
+import '../../styles/global.css';
+import { env } from 'cloudflare:workers';
+import { getDb } from '../../db/client';
+import { verifyCredentials } from '../../lib/auth';
+import { adminHref, isLoggedIn, startSession } from '../../lib/adminSession';
+import { consumeLoginAttempt } from '../../lib/rateLimit';
+
+if (Astro.request.method === 'GET' && (await isLoggedIn(Astro.cookies))) {
+  return Astro.redirect(adminHref(''), 303);
+}
+
+let error = '';
+let user = '';
+
+if (Astro.request.method === 'POST') {
+  let ip = Astro.request.headers.get('cf-connecting-ip') ?? '';
+  if (!ip) {
+    try { ip = Astro.clientAddress; } catch { ip = 'unknown'; }
+  }
+
+  // パスワードを照合する前に回数を数える（成功・失敗を問わず 1 回の試行）
+  const decision = await consumeLoginAttempt(getDb(env.DB), ip, Date.now());
+  if (!decision.allowed) {
+    Astro.response.status = 429;
+    Astro.response.headers.set('Retry-After', String(decision.retryAfterSeconds));
+    const minutes = Math.ceil(decision.retryAfterSeconds / 60);
+    error = `ログインの試行回数が多すぎます。約 ${minutes} 分後にもう一度お試しください。`;
+  } else {
+    const form = await Astro.request.formData();
+    user = String(form.get('user') ?? '');
+    const password = String(form.get('password') ?? '');
+    if (await verifyCredentials(user, password, env.ADMIN_USER ?? '', env.ADMIN_PASSWORD ?? '')) {
+      await startSession(Astro.cookies);
+      return Astro.redirect(adminHref(''), 303);
+    }
+    Astro.response.status = 401;
+    error = 'ユーザー名またはパスワードが違います。';
+  }
+}
+---
+
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="referrer" content="same-origin" />
+    <title>ログイン — JJJ管理</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@100..900&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <div class="grain"></div>
+    <main class="login panel">
+      <p class="login-mark"><span class="site-logo-mark">JJJ</span><span class="hud-label">ADMIN / SIGN IN</span></p>
+      <h1 class="login-title">管理画面ログイン</h1>
+      {error && <p class="login-error" role="alert">{error}</p>}
+      <form method="post" class="login-form">
+        <div class="form-group">
+          <label for="user">ユーザー名</label>
+          <input id="user" name="user" type="text" autocomplete="username" required value={user} autofocus={!user} />
+        </div>
+        <div class="form-group">
+          <label for="password">パスワード</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" required autofocus={!!user} />
+        </div>
+        <button type="submit" class="btn btn-primary">ログイン</button>
+      </form>
+    </main>
+  </body>
+</html>
+
+<style>
+  .login {
+    max-width: 360px;
+    margin: 14vh auto 0;
+    padding: 2rem;
+  }
+  .login-mark { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1rem; }
+  .login-title { font-size: 1.125rem; margin-bottom: 1.25rem; }
+  .login-error { color: var(--accent); font-weight: 600; font-size: 0.875rem; margin-bottom: 1rem; }
+  .login-form { display: flex; flex-direction: column; gap: 1rem; }
+  .login-form .btn { margin-top: 0.5rem; }
+</style>

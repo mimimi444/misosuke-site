@@ -1,0 +1,69 @@
+---
+// トップとタグページで共通の構成: 左（スマホは上）に流れる作品一覧、残りに空中の雑誌。
+import Rail from './Rail.astro';
+import Showcase from './Showcase.astro';
+import DetailPanel from './DetailPanel.astro';
+import type { DetailData } from '../lib/detail';
+import type { RailItem } from '../lib/rail';
+import { showcaseFromRail } from '../lib/showcase';
+import type { FreePageView } from '../lib/freePage/model';
+
+interface Props {
+  items: RailItem[];
+  nextCursor: string | null;
+  /** タグページの見出し（例: #春） */
+  heading?: string;
+  tag?: string;
+  /** トップの雑誌の最後のページ（タグページでは出さない） */
+  free?: FreePageView | null;
+  /** 作品詳細を開いた状態で返すとき */
+  detail?: DetailData | null;
+}
+const { items, nextCursor, heading, tag, free = null, detail = null } = Astro.props;
+// 雑誌は作品一覧の先頭から同じ並び順で、最後にフリーページ
+const showcase = showcaseFromRail(items, free);
+---
+
+<div class="home">
+  {items.length > 0 && <Rail items={items} nextCursor={nextCursor} tag={tag} />}
+  <div class="home-stage">
+    {heading && <h1 class="home-heading panel"><span class="hud-label">TAG</span> {heading}</h1>}
+    <Showcase showcase={showcase} />
+  </div>
+  <DetailPanel detail={detail} />
+</div>
+
+<style is:global>
+  .home {
+    --rail-w: 96px;
+    --rail-h: 76px;
+    position: relative;
+    display: grid;
+    grid-template-columns: var(--rail-w) minmax(0, 1fr);
+    height: calc(100vh - var(--header-h));
+    height: calc(100dvh - var(--header-h));
+    border-bottom: 1px solid var(--line);
+  }
+  .home:not(:has(.rail)) { grid-template-columns: minmax(0, 1fr); }
+  .home > .rail { border-right: 1px solid var(--line); }
+  .home-stage { position: relative; display: grid; min-height: 0; min-width: 0; }
+  .home-stage > .showcase { grid-area: 1 / 1; }
+  .home-stage { isolation: isolate; }
+  .home-heading {
+    grid-area: 1 / 1;
+    align-self: start;
+    justify-self: start;
+    z-index: 3;
+    margin: 1rem;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+  }
+
+  @media (max-width: 768px) {
+    .home { grid-template-columns: minmax(0, 1fr); grid-template-rows: var(--rail-h) minmax(0, 1fr); }
+    .home:not(:has(.rail)) { grid-template-rows: minmax(0, 1fr); }
+    .home > .rail { border-right: none; border-bottom: 1px solid var(--line); }
+  }
+</style>
