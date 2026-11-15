@@ -1,5 +1,6 @@
 // Showcase.astro のブラウザ側の処理。three.js のシーンを動的に読み込む（中身は作品一覧の先頭と同じ並び）。
 import type { Showcase } from './showcase';
+import type { SeekState } from './magazine/scene';
 import { setStage } from './stage';
 
 /** 開いている見開きの右ページの作品へのリンク */
@@ -51,6 +52,37 @@ function createLoading(root: HTMLElement) {
       });
     },
   };
+}
+
+/**
+ * 次のページへ進むまでの時間を、右下のページ数で区切った線で見せる。
+ * 見せ終えたページの区切りは満ち、今のページの区切りが時間とともに伸び、まだのページは空のまま。
+ */
+function bindSeekBar(root: HTMLElement, progress: () => SeekState | null) {
+  const wrap = root.querySelector<HTMLElement>('.showcase-seek');
+  if (!wrap) return;
+  let fills: HTMLElement[] = [];
+  const build = (count: number) => {
+    wrap.replaceChildren(...Array.from({ length: count }, () => {
+      const seg = document.createElement('span');
+      seg.className = 'showcase-seek-seg';
+      const fill = document.createElement('span');
+      seg.appendChild(fill);
+      return seg;
+    }));
+    fills = [...wrap.querySelectorAll<HTMLElement>('.showcase-seek-seg > span')];
+  };
+  const tick = () => {
+    const s = document.hidden ? null : progress();
+    if (!s) delete wrap.dataset.active;
+    else {
+      if (fills.length !== s.count) build(s.count);
+      wrap.dataset.active = '';
+      fills.forEach((f, i) => { f.style.transform = `scaleX(${i < s.page ? 1 : i === s.page ? s.progress : 0})`; });
+    }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
 }
 
 const SWIPE_PX = 30;
@@ -129,6 +161,7 @@ async function setup(root: HTMLElement) {
     });
     root.dataset.mode = '3d';
     bindSwipe(root, hit, (delta) => api.flip(delta));
+    bindSeekBar(root, () => api.turnProgress());
     setStage(api);
     // 100% まで数え終わったら読み込み画面を消し、閉じた雑誌を開いて最新の作品を見せる
     await loading.finished();

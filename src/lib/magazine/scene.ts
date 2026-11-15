@@ -8,7 +8,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { BokehPass } from 'three/addons/postprocessing/BokehPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { PAPER, leafOffsets, shapePage, vertexCount } from './pageShape';
-import { cycleLength, flipCount, forwardEnd, leafProgress, manualTurn, openTime } from './schedule';
+import { cycleLength, flipCount, forwardEnd, leafProgress, manualTurn, openTime, currentPage } from './schedule';
 import { buildLeaves, rightPageIndex as rightIndexOf } from './spread';
 import type { MagazinePage } from './spread';
 import { fitDistance, imageRect, nextPageIndex, type Insets, type Zoom } from './reading';
@@ -64,12 +64,16 @@ const READ_WINDOW = 2;
 /** 読むモードのページ。幅・高さが分かれば、絵の読み込み前から本来の縦横比で並べる */
 export type ReadPage = MagazinePage & { width?: number | null; height?: number | null };
 
+export type SeekState = { page: number; count: number; progress: number };
+
 export type ShowcaseApi = {
   dispose(): void;
   /** 雑誌の中身を差し替え、カメラを正面へ移し、startIndex の絵を右ページに開く */
   read(opts: { pages: ReadPage[]; startIndex: number; insets: Insets }): Promise<void>;
   /** 「見せる」モードに戻す */
   show(viewed?: ViewedPage): void;
+  /** シークバー: 今見せているページ（0 始まり）、ページ数、そのページの進み（0〜1）。手でめくっている間・読むモードでは null */
+  turnProgress(): SeekState | null;
   /** 閉じた状態で始めた雑誌を開く（準備ができたら呼ぶ） */
   open(): void;
   /** 見せるモードで手で 1 枚めくる（スワイプ）。1 = 次、-1 = 前 */
@@ -672,6 +676,9 @@ export async function createShowcaseScene(
   const clock = new THREE.Clock();
   let prevTime = 0;
   let cameraReady = false;
+  /** シークバー: 今の待ち区間の始まり（実際の時刻）と長さ。手でめくった後や開いた後の一時停止も含める */
+  let seekKey = '', seekStart = 0, seekLen = 0, seekPage = -1;
+  let seekValue: SeekState | null = null;
   /** 見せるモードの時間割の時刻（手でめくると実際の時刻からずれる） */
   let showT = 0;
   let manual: { target: number; rate: number } | null = null;
@@ -789,6 +796,24 @@ export async function createShowcaseScene(
       showDone = done;
     }
     if (guest) updateGuest(time, !book);
+
+    if (!book && motion && !manual && Number.isFinite(holdUntil)) {
+      const cur = currentPage(showT, flips);
+      if (cur.riffle) seekValue = { page: 0, count: n, progress: 0 }; // 戻している間は空に
+      else {
+        const pause = Math.max(0, holdUntil - time);
+        const key = `${cur.page}|${cur.from}|${holdUntil}`;
+        if (key !== seekKey) {
+          // 同じページの途中で一時停止が入ったときは、それまでの進みを引き継ぐ
+          const elapsed = seekPage === cur.page ? time - seekStart : 0;
+          seekKey = key;
+          seekPage = cur.page;
+          seekStart = time - elapsed;
+          seekLen = elapsed + Math.max(0, cur.to - showT) + pause;
+        }
+        seekValue = { page: cur.page, count: n, progress: seekLen > 0 ? Math.min(1, (time - seekStart) / seekLen) : 1 };
+      }
+    } else seekValue = null;
 
     if (!book) {
       const flipping = showFlipping, done = showDone;
@@ -1008,6 +1033,9 @@ export async function createShowcaseScene(
         guest = { geo, group, front, back, href: viewed.href, flipAt: now + MOVE_SEC + GUEST_HOLD_SEC, p: 0 };
         lastState = '';
       });
+    },
+    turnProgress() {
+      return seekValue;
     },
     open() {
       if (openP >= 1 || openStart !== null) return;
