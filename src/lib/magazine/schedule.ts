@@ -70,3 +70,24 @@ export function openTime(page: number, leafCount: number): number {
   const k = Math.max(0, Math.min(page, leafCount));
   return k === 0 ? 0 : (k - 1) * T_GAP + T_FLIP;
 }
+
+/**
+ * 今のページを見せている区間: そのページが現れ始めた時刻（前の紙をめくり始めた時刻）から、次の紙をめくり始めるまで。
+ * 最後のページは戻し始めるまで、戻し終えた後は次の周回の 1 枚目をめくり始めるまで。戻している間は null。
+ * 次のページへ進むまでの時間の見える化（シークバー）に使う。
+ */
+export function waitSegment(t: number, leafCount: number): { from: number; to: number } | null {
+  if (leafCount <= 0) return null;
+  const cycle = cycleLength(leafCount);
+  const base = Math.floor(t / cycle) * cycle;
+  const local = t - base;
+  const end = forwardEnd(leafCount);
+  if (local >= end) {
+    const riffleEnd = end + (leafCount - 1) * T_RIFFLE + T_BACK;
+    return local < riffleEnd ? null : { from: base + riffleEnd, to: base + cycle };
+  }
+  const i = Math.min(leafCount - 1, Math.floor(local / T_GAP));
+  const from = i * T_GAP;
+  const to = i < leafCount - 1 ? (i + 1) * T_GAP : end;
+  return { from: base + from, to: base + to };
+}

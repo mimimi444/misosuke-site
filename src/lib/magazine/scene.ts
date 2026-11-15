@@ -8,7 +8,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { BokehPass } from 'three/addons/postprocessing/BokehPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { PAPER, leafOffsets, shapePage, vertexCount } from './pageShape';
-import { cycleLength, flipCount, forwardEnd, leafProgress, manualTurn, openTime } from './schedule';
+import { cycleLength, flipCount, forwardEnd, leafProgress, manualTurn, openTime, waitSegment } from './schedule';
 import { buildLeaves, rightPageIndex as rightIndexOf } from './spread';
 import type { MagazinePage } from './spread';
 import { fitDistance, imageRect, nextPageIndex, type Insets, type Zoom } from './reading';
@@ -70,6 +70,8 @@ export type ShowcaseApi = {
   read(opts: { pages: ReadPage[]; startIndex: number; insets: Insets }): Promise<void>;
   /** 「見せる」モードに戻す */
   show(viewed?: ViewedPage): void;
+  /** 次のページをめくり始めるまでの進み（0〜1）。めくっている間・止めている間・読むモードでは null */
+  turnProgress(): number | null;
   /** 閉じた状態で始めた雑誌を開く（準備ができたら呼ぶ） */
   open(): void;
   /** 見せるモードで手で 1 枚めくる（スワイプ）。1 = 次、-1 = 前 */
@@ -672,6 +674,9 @@ export async function createShowcaseScene(
   const clock = new THREE.Clock();
   let prevTime = 0;
   let cameraReady = false;
+  /** シークバー: 今の待ち区間の始まり（実際の時刻）と長さ。手でめくった後や開いた後の一時停止も含める */
+  let seekKey = '', seekStart = 0, seekLen = 0;
+  let seekValue: number | null = null;
   /** 見せるモードの時間割の時刻（手でめくると実際の時刻からずれる） */
   let showT = 0;
   let manual: { target: number; rate: number } | null = null;
@@ -789,6 +794,20 @@ export async function createShowcaseScene(
       showDone = done;
     }
     if (guest) updateGuest(time, !book);
+
+    if (!book && motion && !manual) {
+      const seg = waitSegment(showT, flips);
+      if (!seg || !Number.isFinite(holdUntil)) seekValue = null;
+      else {
+        const key = `${seg.from}|${holdUntil}`;
+        if (key !== seekKey) {
+          seekKey = key;
+          seekStart = time;
+          seekLen = Math.max(0, holdUntil - time) + Math.max(0, seg.to - showT);
+        }
+        seekValue = seekLen > 0 ? Math.min(1, (time - seekStart) / seekLen) : null;
+      }
+    } else seekValue = null;
 
     if (!book) {
       const flipping = showFlipping, done = showDone;
@@ -1008,6 +1027,9 @@ export async function createShowcaseScene(
         guest = { geo, group, front, back, href: viewed.href, flipAt: now + MOVE_SEC + GUEST_HOLD_SEC, p: 0 };
         lastState = '';
       });
+    },
+    turnProgress() {
+      return seekValue;
     },
     open() {
       if (openP >= 1 || openStart !== null) return;

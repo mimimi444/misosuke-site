@@ -53,6 +53,23 @@ function createLoading(root: HTMLElement) {
   };
 }
 
+/** 次のページへ進むまでの時間を、右下の細い線の伸びで見せる */
+function bindSeekBar(root: HTMLElement, progress: () => number | null) {
+  const wrap = root.querySelector<HTMLElement>('.showcase-seek');
+  const bar = root.querySelector<HTMLElement>('[data-role="seek"]');
+  if (!wrap || !bar) return;
+  const tick = () => {
+    const p = document.hidden ? null : progress();
+    if (p === null) delete wrap.dataset.active;
+    else {
+      wrap.dataset.active = '';
+      bar.style.transform = `scaleX(${p})`;
+    }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
 const SWIPE_PX = 30;
 
 /** スマホ・タブレット: 雑誌の上の横スワイプでページをめくる（左へ＝次、右へ＝前）。スワイプしたときはリンクを開かない */
@@ -129,6 +146,7 @@ async function setup(root: HTMLElement) {
     });
     root.dataset.mode = '3d';
     bindSwipe(root, hit, (delta) => api.flip(delta));
+    bindSeekBar(root, () => api.turnProgress());
     setStage(api);
     // 100% まで数え終わったら読み込み画面を消し、閉じた雑誌を開いて最新の作品を見せる
     await loading.finished();

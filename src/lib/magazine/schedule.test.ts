@@ -84,3 +84,27 @@ describe('指定したページを開いた時刻', () => {
     expect(openTime(9, 4)).toBe(openTime(4, 4));
   });
 });
+
+import { waitSegment } from './schedule';
+
+describe('次のページへ進むまでの時間（今のページを見せている区間）', () => {
+  const n = 4;
+  test('ページは、前の紙をめくり始めてから次の紙をめくり始めるまで', () => {
+    expect(waitSegment(1.0, n)).toEqual({ from: 0, to: 2.5 });
+    expect(waitSegment(3.0, n)).toEqual({ from: 2.5, to: 5 });
+  });
+  test('最後のページは、戻し始めるまで', () => {
+    expect(waitSegment(forwardEnd(n) - 0.5, n)).toEqual({ from: 3 * 2.5, to: forwardEnd(n) });
+  });
+  test('戻している間は null、戻し終えてから次の周回の 1 枚目まで', () => {
+    expect(waitSegment(forwardEnd(n) + 0.1, n)).toBeNull();
+    const c = cycleLength(n);
+    const seg = waitSegment(c - 0.2, n)!;
+    expect(seg.to).toBeCloseTo(c);
+    expect(seg.from).toBeCloseTo(forwardEnd(n) + 3 * 0.12 + 0.8);
+  });
+  test('周回の途中でも、その周回の中で計算する', () => {
+    const c = cycleLength(n);
+    expect(waitSegment(c + 3.0, n)).toEqual({ from: c + 2.5, to: c + 5 });
+  });
+});
