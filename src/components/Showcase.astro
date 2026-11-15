@@ -29,8 +29,8 @@ const fallbackHref = first?.href ?? '#';
         <p class="showcase-title" data-role="title">{fallback.title}</p>
         <p class="hud-label" data-role="count">{fallback.pages.length} PAGES</p>
       </div>
-      <!-- 次のページへ進むまでの時間（時間とともに伸びる） -->
-      <span class="showcase-hud showcase-seek" aria-hidden="true"><span data-role="seek"></span></span>
+      <!-- 次のページへ進むまでの時間（ページ数で区切った線。区切りはブラウザ側で作る） -->
+      <span class="showcase-hud showcase-seek" aria-hidden="true"></span>
       <p class="showcase-hud showcase-turn hud-label" data-role="turn">AUTO TURN ・ 01 / {String(fallback.pages.length).padStart(2, '0')}</p>
 
       <!-- 3D の雑誌の準備ができるまでの読み込み画面（JavaScript が動くときだけ出す） -->
@@ -88,22 +88,22 @@ const fallbackHref = first?.href ?? '#';
     .showcase-now .hud-label { font-size: 0.6rem; white-space: nowrap; }
     .showcase-title { font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
     .showcase-turn { left: 0.6rem; bottom: 0.6rem; font-size: 0.6rem; }
-    .showcase-seek { right: 0.8rem; bottom: 0.8rem; width: 80px; }
+    .showcase-seek { right: 0.8rem; bottom: 0.8rem; width: 110px; gap: 2px; }
   }
   .showcase-title { font-weight: 700; overflow-wrap: anywhere; }
   .showcase-turn { left: 1rem; bottom: 1rem; }
   .showcase-seek {
     right: 1.25rem;
     bottom: 1.15rem;
-    width: 120px;
-    height: 2px;
-    background: var(--line-strong);
-    overflow: hidden;
+    width: 160px;
+    display: flex;
+    gap: 3px;
     opacity: 0;
     transition: opacity 0.3s;
   }
   .showcase-seek[data-active] { opacity: 1; }
-  .showcase-seek span { display: block; width: 100%; height: 100%; background: var(--accent); transform: scaleX(0); transform-origin: left center; }
+  .showcase-seek-seg { flex: 1; height: 2px; background: var(--line-strong); overflow: hidden; }
+  .showcase-seek-seg > span { display: block; width: 100%; height: 100%; background: var(--accent); transform: scaleX(0); transform-origin: left center; }
 
   .showcase-empty { margin: 2rem; }
 

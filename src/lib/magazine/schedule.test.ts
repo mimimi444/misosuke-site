@@ -85,29 +85,30 @@ describe('指定したページを開いた時刻', () => {
   });
 });
 
-import { waitSegment } from './schedule';
+import { currentPage } from './schedule';
 
-describe('次のページへ進むまでの時間（ページを開いてから次をめくり始めるまで）', () => {
-  const n = 4;
-  test('1 枚目をめくり終えてから、2 枚目をめくり始めるまで', () => {
-    expect(waitSegment(2.0, n)).toEqual({ from: 1.9, to: 2.5 });
+describe('今見せているページとその区間（シークバー）', () => {
+  const n = 4; // めくる紙 4 枚 = 5 ページ
+  test('1 枚目をめくり始めてから 2 枚目をめくり始めるまでは 2 ページ目（めくっている時間も含む）', () => {
+    expect(currentPage(1.0, n)).toEqual({ page: 1, from: 0, to: 2.5, riffle: false });
+    expect(currentPage(2.0, n)).toEqual({ page: 1, from: 0, to: 2.5, riffle: false });
   });
-  test('めくっている間は null', () => {
-    expect(waitSegment(1.0, n)).toBeNull();
-    expect(waitSegment(3.0, n)).toBeNull();
+  test('めくり始める瞬間（止めているとき）は前のページ', () => {
+    expect(currentPage(2.5, n)).toEqual({ page: 1, from: 0, to: 2.5, riffle: false });
+    expect(currentPage(0, n).page).toBe(0);
   });
-  test('最後のページは、戻し始めるまで', () => {
-    expect(waitSegment(forwardEnd(n) - 0.5, n)).toEqual({ from: 3 * 2.5 + 1.9, to: forwardEnd(n) });
+  test('最後のページは戻し始めるまで', () => {
+    expect(currentPage(forwardEnd(n) - 0.1, n)).toEqual({ page: 4, from: 3 * 2.5, to: forwardEnd(n), riffle: false });
   });
-  test('戻している間は null、戻し終えてから次の周回の 1 枚目まで', () => {
-    expect(waitSegment(forwardEnd(n) + 0.1, n)).toBeNull();
+  test('戻している間は riffle、戻し終えたら 1 ページ目', () => {
+    expect(currentPage(forwardEnd(n) + 0.1, n)).toEqual({ page: 0, riffle: true });
     const c = cycleLength(n);
-    const seg = waitSegment(c - 0.2, n)!;
-    expect(seg.to).toBeCloseTo(c);
-    expect(seg.from).toBeCloseTo(forwardEnd(n) + 3 * 0.12 + 0.8);
+    const p = currentPage(c - 0.2, n);
+    expect(p.page).toBe(0);
+    expect(!p.riffle && p.to).toBeCloseTo(c);
   });
   test('周回の途中でも、その周回の中で計算する', () => {
     const c = cycleLength(n);
-    expect(waitSegment(c + 2.0, n)).toEqual({ from: c + 1.9, to: c + 2.5 });
+    expect(currentPage(c + 3.0, n)).toEqual({ page: 2, from: c + 2.5, to: c + 5, riffle: false });
   });
 });

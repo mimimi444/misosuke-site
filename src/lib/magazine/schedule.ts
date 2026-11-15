@@ -72,23 +72,24 @@ export function openTime(page: number, leafCount: number): number {
 }
 
 /**
- * ページを開いて止まっている区間: 前の紙がめくり終わった時刻から、次の紙をめくり始めるまで。
- * 最後のページは戻し始めるまで、戻し終えた後は次の周回の 1 枚目をめくり始めるまで。めくっている・戻している間は null。
- * 次のページへ進むまでの時間の見える化（シークバー）に使う。
+ * 今見せているページ（0 始まり）と、そのページの区間（そのページが現れ始めてから、次の紙をめくり始めるまで）。
+ * めくっている時間も含む。最後のページは戻し始めるまで、戻し終えた後は 1 ページ目で次の周回の 1 枚目をめくり始めるまで。
+ * 戻している間は riffle。区間の境目（次の紙をめくり始める瞬間）は前のページに含める（そこで止めているときのため）。
+ * シークバー（ページごとに区切った線）に使う。
  */
-export function waitSegment(t: number, leafCount: number): { from: number; to: number } | null {
-  if (leafCount <= 0) return null;
+export function currentPage(t: number, leafCount: number):
+  | { page: number; from: number; to: number; riffle: false }
+  | { page: 0; riffle: true } {
   const cycle = cycleLength(leafCount);
   const base = Math.floor(t / cycle) * cycle;
   const local = t - base;
   const end = forwardEnd(leafCount);
-  if (local >= end) {
-    const riffleEnd = end + (leafCount - 1) * T_RIFFLE + T_BACK;
-    return local < riffleEnd ? null : { from: base + riffleEnd, to: base + cycle };
-  }
-  const done = local >= T_FLIP ? Math.min(leafCount, Math.floor((local - T_FLIP) / T_GAP) + 1) : 0;
-  if (done < leafCount && local > done * T_GAP) return null; // めくっている途中
-  const from = done === 0 ? 0 : (done - 1) * T_GAP + T_FLIP;
-  const to = done < leafCount ? done * T_GAP : end;
-  return to > from ? { from: base + from, to: base + to } : null;
+  const riffleEnd = end + Math.max(0, leafCount - 1) * T_RIFFLE + (leafCount > 0 ? T_BACK : 0);
+  if (leafCount <= 0) return { page: 0, from: base, to: base + cycle, riffle: false };
+  if (local === 0) return { page: 0, from: base + riffleEnd - cycle, to: base, riffle: false };
+  if (local > end && local < riffleEnd) return { page: 0, riffle: true };
+  if (local >= riffleEnd) return { page: 0, from: base + riffleEnd, to: base + cycle, riffle: false };
+  const i = Math.min(leafCount - 1, Math.ceil(local / T_GAP) - 1);
+  const to = i < leafCount - 1 ? (i + 1) * T_GAP : end;
+  return { page: i + 1, from: base + i * T_GAP, to: base + to, riffle: false };
 }

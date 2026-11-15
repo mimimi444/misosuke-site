@@ -1,5 +1,6 @@
 // Showcase.astro のブラウザ側の処理。three.js のシーンを動的に読み込む（中身は作品一覧の先頭と同じ並び）。
 import type { Showcase } from './showcase';
+import type { SeekState } from './magazine/scene';
 import { setStage } from './stage';
 
 /** 開いている見開きの右ページの作品へのリンク */
@@ -53,17 +54,31 @@ function createLoading(root: HTMLElement) {
   };
 }
 
-/** 次のページへ進むまでの時間を、右下の細い線の伸びで見せる */
-function bindSeekBar(root: HTMLElement, progress: () => number | null) {
+/**
+ * 次のページへ進むまでの時間を、右下のページ数で区切った線で見せる。
+ * 見せ終えたページの区切りは満ち、今のページの区切りが時間とともに伸び、まだのページは空のまま。
+ */
+function bindSeekBar(root: HTMLElement, progress: () => SeekState | null) {
   const wrap = root.querySelector<HTMLElement>('.showcase-seek');
-  const bar = root.querySelector<HTMLElement>('[data-role="seek"]');
-  if (!wrap || !bar) return;
+  if (!wrap) return;
+  let fills: HTMLElement[] = [];
+  const build = (count: number) => {
+    wrap.replaceChildren(...Array.from({ length: count }, () => {
+      const seg = document.createElement('span');
+      seg.className = 'showcase-seek-seg';
+      const fill = document.createElement('span');
+      seg.appendChild(fill);
+      return seg;
+    }));
+    fills = [...wrap.querySelectorAll<HTMLElement>('.showcase-seek-seg > span')];
+  };
   const tick = () => {
-    const p = document.hidden ? null : progress();
-    if (p === null) delete wrap.dataset.active;
+    const s = document.hidden ? null : progress();
+    if (!s) delete wrap.dataset.active;
     else {
+      if (fills.length !== s.count) build(s.count);
       wrap.dataset.active = '';
-      bar.style.transform = `scaleX(${p})`;
+      fills.forEach((f, i) => { f.style.transform = `scaleX(${i < s.page ? 1 : i === s.page ? s.progress : 0})`; });
     }
     requestAnimationFrame(tick);
   };
