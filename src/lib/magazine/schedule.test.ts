@@ -87,14 +87,17 @@ describe('指定したページを開いた時刻', () => {
 
 import { waitSegment } from './schedule';
 
-describe('次のページへ進むまでの時間（今のページを見せている区間）', () => {
+describe('次のページへ進むまでの時間（ページを開いてから次をめくり始めるまで）', () => {
   const n = 4;
-  test('ページは、前の紙をめくり始めてから次の紙をめくり始めるまで', () => {
-    expect(waitSegment(1.0, n)).toEqual({ from: 0, to: 2.5 });
-    expect(waitSegment(3.0, n)).toEqual({ from: 2.5, to: 5 });
+  test('1 枚目をめくり終えてから、2 枚目をめくり始めるまで', () => {
+    expect(waitSegment(2.0, n)).toEqual({ from: 1.9, to: 2.5 });
+  });
+  test('めくっている間は null', () => {
+    expect(waitSegment(1.0, n)).toBeNull();
+    expect(waitSegment(3.0, n)).toBeNull();
   });
   test('最後のページは、戻し始めるまで', () => {
-    expect(waitSegment(forwardEnd(n) - 0.5, n)).toEqual({ from: 3 * 2.5, to: forwardEnd(n) });
+    expect(waitSegment(forwardEnd(n) - 0.5, n)).toEqual({ from: 3 * 2.5 + 1.9, to: forwardEnd(n) });
   });
   test('戻している間は null、戻し終えてから次の周回の 1 枚目まで', () => {
     expect(waitSegment(forwardEnd(n) + 0.1, n)).toBeNull();
@@ -105,6 +108,6 @@ describe('次のページへ進むまでの時間（今のページを見せて�
   });
   test('周回の途中でも、その周回の中で計算する', () => {
     const c = cycleLength(n);
-    expect(waitSegment(c + 3.0, n)).toEqual({ from: c + 2.5, to: c + 5 });
+    expect(waitSegment(c + 2.0, n)).toEqual({ from: c + 1.9, to: c + 2.5 });
   });
 });

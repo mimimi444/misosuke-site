@@ -72,8 +72,8 @@ export function openTime(page: number, leafCount: number): number {
 }
 
 /**
- * 今のページを見せている区間: そのページが現れ始めた時刻（前の紙をめくり始めた時刻）から、次の紙をめくり始めるまで。
- * 最後のページは戻し始めるまで、戻し終えた後は次の周回の 1 枚目をめくり始めるまで。戻している間は null。
+ * ページを開いて止まっている区間: 前の紙がめくり終わった時刻から、次の紙をめくり始めるまで。
+ * 最後のページは戻し始めるまで、戻し終えた後は次の周回の 1 枚目をめくり始めるまで。めくっている・戻している間は null。
  * 次のページへ進むまでの時間の見える化（シークバー）に使う。
  */
 export function waitSegment(t: number, leafCount: number): { from: number; to: number } | null {
@@ -86,8 +86,9 @@ export function waitSegment(t: number, leafCount: number): { from: number; to: n
     const riffleEnd = end + (leafCount - 1) * T_RIFFLE + T_BACK;
     return local < riffleEnd ? null : { from: base + riffleEnd, to: base + cycle };
   }
-  const i = Math.min(leafCount - 1, Math.floor(local / T_GAP));
-  const from = i * T_GAP;
-  const to = i < leafCount - 1 ? (i + 1) * T_GAP : end;
-  return { from: base + from, to: base + to };
+  const done = local >= T_FLIP ? Math.min(leafCount, Math.floor((local - T_FLIP) / T_GAP) + 1) : 0;
+  if (done < leafCount && local > done * T_GAP) return null; // めくっている途中
+  const from = done === 0 ? 0 : (done - 1) * T_GAP + T_FLIP;
+  const to = done < leafCount ? done * T_GAP : end;
+  return to > from ? { from: base + from, to: base + to } : null;
 }

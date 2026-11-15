@@ -797,13 +797,18 @@ export async function createShowcaseScene(
 
     if (!book && motion && !manual) {
       const seg = waitSegment(showT, flips);
-      if (!seg || !Number.isFinite(holdUntil)) seekValue = null;
+      // めくっている間は空のまま見せ（消すと点滅して見える）、戻している間・開く前は消す
+      const turning = flips > 0 && showT % cycleLength(flips) < forwardEnd(flips);
+      // 開いた直後・手でめくった後などの一時停止中（どの紙も動いていない）も、止まっている区間として数える
+      const paused = time < holdUntil && showFlipping === 0;
+      if (!Number.isFinite(holdUntil)) seekValue = null;
+      else if (!seg && !paused) seekValue = turning ? 0 : null;
       else {
-        const key = `${seg.from}|${holdUntil}`;
+        const key = seg ? `${seg.from}|${holdUntil}` : `pause|${holdUntil}`;
         if (key !== seekKey) {
           seekKey = key;
           seekStart = time;
-          seekLen = Math.max(0, holdUntil - time) + Math.max(0, seg.to - showT);
+          seekLen = Math.max(0, holdUntil - time) + (seg ? Math.max(0, seg.to - showT) : 0);
         }
         seekValue = seekLen > 0 ? Math.min(1, (time - seekStart) / seekLen) : null;
       }
