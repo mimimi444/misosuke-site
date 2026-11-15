@@ -52,3 +52,39 @@
   --gap: clamp(1rem, 2vw, 1.5rem);
   --header-h: 56px;
 }
+
+/* =====================================================
+   テーマカラー（管理画面の「テーマカラー」で選ぶ）。<html data-theme="…"> で切り替える。
+   [data-theme-swatch="…"] は、管理画面の色見本にその色を出すため。
+   一覧と表示名は src/lib/theme.ts の THEMES と合わせる。orange は既定（:root の値）
+   ===================================================== */
+:root[data-theme="red"], [data-theme-swatch="red"] {
+  --accent: #e5383b; --accent-dim: #b82326; --accent-ink: #ffffff; --accent-soft: rgba(229, 56, 59, 0.12);
+}
+:root[data-theme="pink"], [data-theme-swatch="pink"] {
+  --accent: #e84a8a; --accent-dim: #c02f6c; --accent-ink: #ffffff; --accent-soft: rgba(232, 74, 138, 0.12);
+}
+:root[data-theme="violet"], [data-theme-swatch="violet"] {
+  --accent: #8b5cf6; --accent-dim: #6d3fd6; --accent-ink: #ffffff; --accent-soft: rgba(139, 92, 246, 0.12);
+}
+:root[data-theme="indigo"], [data-theme-swatch="indigo"] {
+  --accent: #4361ee; --accent-dim: #2f47c4; --accent-ink: #ffffff; --accent-soft: rgba(67, 97, 238, 0.12);
+}
+:root[data-theme="sky"], [data-theme-swatch="sky"] {
+  --accent: #1e9bd7; --accent-dim: #157aab; --accent-ink: #ffffff; --accent-soft: rgba(30, 155, 215, 0.12);
+}
+:root[data-theme="teal"], [data-theme-swatch="teal"] {
+  --accent: #14a098; --accent-dim: #0e7a74; --accent-ink: #ffffff; --accent-soft: rgba(20, 160, 152, 0.12);
+}
+:root[data-theme="green"], [data-theme-swatch="green"] {
+  --accent: #3a9d4b; --accent-dim: #2b7a39; --accent-ink: #ffffff; --accent-soft: rgba(58, 157, 75, 0.12);
+}
+:root[data-theme="mustard"], [data-theme-swatch="mustard"] {
+  --accent: #d99a00; --accent-dim: #a87700; --accent-ink: #2b2b2b; --accent-soft: rgba(217, 154, 0, 0.14);
+}
+:root[data-theme="charcoal"], [data-theme-swatch="charcoal"] {
+  --accent: #3d3d3d; --accent-dim: #222222; --accent-ink: #ffffff; --accent-soft: rgba(61, 61, 61, 0.1);
+}
+[data-theme-swatch="orange"] {
+  --accent: #ff5714; --accent-dim: #d9450c; --accent-ink: #ffffff; --accent-soft: rgba(255, 87, 20, 0.12);
+}

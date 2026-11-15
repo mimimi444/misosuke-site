@@ -5,6 +5,7 @@ import { getDb } from '../../db/client';
 import { verifyCredentials } from '../../lib/auth';
 import { adminHref, isLoggedIn, startSession } from '../../lib/adminSession';
 import { consumeLoginAttempt } from '../../lib/rateLimit';
+import { loadTheme } from '../../lib/themeStore';
 
 if (Astro.request.method === 'GET' && (await isLoggedIn(Astro.cookies))) {
   return Astro.redirect(adminHref(''), 303);
@@ -38,10 +39,11 @@ if (Astro.request.method === 'POST') {
     error = 'ユーザー名またはパスワードが違います。';
   }
 }
+const theme = await loadTheme(getDb(env.DB));
 ---
 
 <!doctype html>
-<html lang="ja">
+<html lang="ja" data-theme={theme}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />

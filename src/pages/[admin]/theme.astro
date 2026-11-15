@@ -1,0 +1,110 @@
+---
+// サイトのテーマカラー。選ぶとこの画面の色がすぐ変わり（保存前の確認）、保存すると全ページに反映する
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { env } from 'cloudflare:workers';
+import { getDb } from '../../db/client';
+import { THEMES } from '../../lib/theme';
+import { loadTheme } from '../../lib/themeStore';
+
+const current = await loadTheme(getDb(env.DB));
+---
+
+<AdminLayout title="テーマカラー">
+  <h2 class="page-title">テーマカラー <span class="hud-label">THEME</span></h2>
+  <p class="theme-lead">色を選ぶと、この管理画面の色がすぐ変わります。よければ「保存する」で全ページに反映します。</p>
+
+  <form class="panel theme-form" data-saved={current}>
+    <fieldset class="theme-list">
+      <legend class="hud-label">COLOR</legend>
+      {THEMES.map((t) => (
+        <label class="theme-option">
+          <input type="radio" name="theme" value={t.id} checked={t.id === current} />
+          <span class="theme-swatch" data-theme-swatch={t.id} aria-hidden="true"></span>
+          <span class="theme-name">{t.label}</span>
+        </label>
+      ))}
+    </fieldset>
+
+    <div class="row theme-actions">
+      <button type="submit" class="btn btn-primary" data-role="save">保存する</button>
+      <button type="button" class="btn btn-ghost" data-role="reset">元に戻す</button>
+      <p class="theme-status" role="status" data-role="status"></p>
+    </div>
+  </form>
+</AdminLayout>
+
+<style>
+  .theme-lead { color: var(--ink-muted); font-size: 0.9rem; margin-bottom: 1rem; }
+  .theme-form { max-width: 720px; display: flex; flex-direction: column; gap: 1.25rem; }
+  .theme-list { border: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 0.6rem; }
+  .theme-list legend { margin-bottom: 0.6rem; }
+  .theme-option {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    background: var(--panel-solid);
+    cursor: pointer;
+  }
+  .theme-option:has(input:checked) { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
+  .theme-option:has(input:focus-visible) { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .theme-option input { position: absolute; opacity: 0; pointer-events: none; }
+  .theme-swatch { width: 1.4rem; height: 1.4rem; border-radius: var(--r-pill); background: var(--accent); box-shadow: inset 0 0 0 1px var(--line-strong); flex: none; }
+  .theme-name { font-size: 0.85rem; }
+  .theme-actions { align-items: center; gap: 0.75rem; }
+  .theme-status { margin: 0; font-size: 0.85rem; color: var(--ink-muted); }
+  .theme-status[data-kind="error"] { color: var(--danger); }
+</style>
+
+<script>
+  import { actions } from 'astro:actions';
+
+  const form = document.querySelector<HTMLFormElement>('.theme-form');
+  if (form) {
+    const status = form.querySelector<HTMLElement>('[data-role="status"]')!;
+    const save = form.querySelector<HTMLButtonElement>('[data-role="save"]')!;
+    let saved = form.dataset.saved ?? 'orange';
+    const selected = () => form.querySelector<HTMLInputElement>('input[name="theme"]:checked')?.value ?? saved;
+    const show = (text: string, kind: 'ok' | 'error' | '' = '') => {
+      status.textContent = text;
+      if (kind) status.dataset.kind = kind;
+      else delete status.dataset.kind;
+    };
+    const refresh = () => {
+      const changed = selected() !== saved;
+      save.disabled = !changed;
+      if (changed) show('保存前の確認中です（ほかのページはまだ変わっていません）');
+    };
+
+    // 選んだ色を、保存する前にこの画面へすぐ当てる
+    form.addEventListener('change', () => {
+      document.documentElement.dataset.theme = selected();
+      refresh();
+    });
+    form.querySelector('[data-role="reset"]')!.addEventListener('click', () => {
+      const input = form.querySelector<HTMLInputElement>(`input[name="theme"][value="${saved}"]`);
+      if (input) input.checked = true;
+      document.documentElement.dataset.theme = saved;
+      refresh();
+      show('');
+    });
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const theme = selected();
+      save.disabled = true;
+      show('保存中…');
+      const { error } = await actions.saveTheme({ theme });
+      if (error) {
+        save.disabled = false;
+        show(error.message, 'error');
+        return;
+      }
+      saved = theme;
+      form.dataset.saved = theme;
+      show('保存しました。全ページに反映されます。', 'ok');
+    });
+    refresh();
+  }
+</script>

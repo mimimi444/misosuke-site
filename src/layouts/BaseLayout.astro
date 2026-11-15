@@ -2,6 +2,9 @@
 import '../styles/global.css';
 import { isLoggedIn } from '../lib/adminSession';
 import SiteHeader from '../components/SiteHeader.astro';
+import { env } from 'cloudflare:workers';
+import { getDb } from '../db/client';
+import { loadTheme } from '../lib/themeStore';
 
 interface Props {
   title?: string;
@@ -11,9 +14,11 @@ const { title = 'JJJ', description = '' } = Astro.props;
 
 // ログイン中だけ、管理画面へのリンクを出す（キャッシュさせない設定は src/middleware.ts で付ける）
 const loggedIn = await isLoggedIn(Astro.cookies);
+// 管理画面で選んだテーマカラー（tokens.css の [data-theme]）
+const theme = await loadTheme(getDb(env.DB));
 ---
 <!doctype html>
-<html lang="ja">
+<html lang="ja" data-theme={theme}>
   <head>
     <meta charset="UTF-8" />
     <!-- JavaScript が動く環境だけ、トップの雑誌の読み込み画面を出す（.js） -->

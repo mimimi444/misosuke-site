@@ -7,13 +7,17 @@ interface Props {
 const { title = '管理画面' } = Astro.props;
 import { adminHref } from '../lib/adminSession';
 import SiteHeader from '../components/SiteHeader.astro';
+import { env } from 'cloudflare:workers';
+import { getDb } from '../db/client';
+import { loadTheme } from '../lib/themeStore';
+const theme = await loadTheme(getDb(env.DB));
 const pathname = Astro.url.pathname.replace(/\/$/, '');
 const isAt = (p: string) => pathname === adminHref(p);
 const isUnderPath = (p: string) => isAt(p) || pathname.startsWith(adminHref(p) + '/');
 ---
 
 <!doctype html>
-<html lang="ja">
+<html lang="ja" data-theme={theme}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -40,6 +44,7 @@ const isUnderPath = (p: string) => isAt(p) || pathname.startsWith(adminHref(p) +
         <a href={adminHref('/images')} class:list={['admin-sidebar-link', { active: isAt('/images') }]}>画像管理</a>
         <a href={adminHref('/albums')} class:list={['admin-sidebar-link', { active: isUnderPath('/albums') }]}>アルバム管理</a>
         <a href={adminHref('/free-page')} class:list={['admin-sidebar-link', { active: isAt('/free-page') }]}>フリーページ</a>
+        <a href={adminHref('/theme')} class:list={['admin-sidebar-link', { active: isAt('/theme') }]}>テーマカラー</a>
         <form method="post" action={adminHref('/logout')} class="admin-logout">
           <button type="submit" class="btn btn-ghost btn-sm">ログアウト</button>
         </form>
