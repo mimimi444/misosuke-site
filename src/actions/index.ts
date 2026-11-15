@@ -15,6 +15,8 @@ import { tagSlug } from '../lib/tags';
 import { albumSlug } from '../lib/albumSlug';
 import { pageProblems, parseFreePage } from '../lib/freePage/model';
 import { missingImageIds, saveFreePage } from '../lib/freePage/store';
+import { isThemeId } from '../lib/theme';
+import { saveTheme } from '../lib/themeStore';
 
 /**
  * カンマ区切りのタグ名を画像に結び付ける。タグがなければ作る。
@@ -231,6 +233,15 @@ export const server = {
       if ((await missingImageIds(db, page)).length > 0) problems.push('削除された画像が含まれています');
       if (problems.length > 0) throw new ActionError({ code: 'BAD_REQUEST', message: problems.join('\n') });
       await saveFreePage(db, page);
+      return { ok: true };
+    },
+  }),
+  /** サイトのテーマカラーを保存する（全ページに反映） */
+  saveTheme: defineAction({
+    input: z.object({ theme: z.string().max(32) }),
+    handler: async ({ theme }) => {
+      if (!isThemeId(theme)) throw new ActionError({ code: 'BAD_REQUEST', message: '知らない色です' });
+      await saveTheme(getDb(env.DB), theme);
       return { ok: true };
     },
   }),
